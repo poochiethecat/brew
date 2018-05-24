@@ -1,3 +1,4 @@
+require "cache_store"
 require "formula_support"
 require "lock_file"
 require "formula_pin"
@@ -368,6 +369,15 @@ class Formula
   # If this is a `@`-versioned formula.
   def versioned_formula?
     name.include?("@")
+  end
+
+  # Returns any `@`-versioned formulae for an non-`@`-versioned formula.
+  def versioned_formulae
+    return [] if versioned_formula?
+
+    Pathname.glob(path.to_s.gsub(/\.rb$/, "@*.rb")).map do |path|
+      Formula[path.basename(".rb").to_s]
+    end.sort
   end
 
   # A named Resource for the currently active {SoftwareSpec}.
@@ -1526,8 +1536,14 @@ class Formula
     keg = opt_or_installed_prefix_keg
     return [] unless keg
 
-    linkage_checker = LinkageChecker.new(keg, self)
-    linkage_checker.undeclared_deps.map { |n| Dependency.new(n) }
+    undeclared_deps = CacheStoreDatabase.use(:linkage) do |db|
+      linkage_checker = LinkageChecker.new(
+        keg, self, cache_db: db, use_cache: !ENV["HOMEBREW_LINKAGE_CACHE"].nil?
+      )
+      linkage_checker.undeclared_deps.map { |n| Dependency.new(n) }
+    end
+
+    undeclared_deps
   end
 
   # Returns a list of formulae depended on by this formula that aren't
@@ -1548,44 +1564,35 @@ class Formula
     hsh = {
       "name" => name,
       "full_name" => full_name,
-      "desc" => desc,
-      "homepage" => homepage,
       "oldname" => oldname,
       "aliases" => aliases.sort,
+      "versioned_formulae" => versioned_formulae.map(&:name),
+      "desc" => desc,
+      "homepage" => homepage,
       "versions" => {
         "stable" => stable&.version&.to_s,
-        "bottle" => !bottle_specification.checksums.empty?,
         "devel" => devel&.version&.to_s,
         "head" => head&.version&.to_s,
+        "bottle" => !bottle_specification.checksums.empty?,
       },
       "revision" => revision,
       "version_scheme" => version_scheme,
+      "bottle" => {},
+      "keg_only" => keg_only?,
+      "options" => [],
+      "build_dependencies" => dependencies.select(&:build?).map(&:name).uniq,
+      "dependencies" => dependencies.reject(&:optional?).reject(&:recommended?).reject(&:build?).map(&:name).uniq,
+      "recommended_dependencies" => dependencies.select(&:recommended?).map(&:name).uniq,
+      "optional_dependencies" => dependencies.select(&:optional?).map(&:name).uniq,
+      "requirements" => [],
+      "conflicts_with" => conflicts.map(&:name),
+      "caveats" => caveats,
       "installed" => [],
       "linked_keg" => linked_version&.to_s,
       "pinned" => pinned?,
       "outdated" => outdated?,
-      "keg_only" => keg_only?,
-      "dependencies" => dependencies.map(&:name).uniq,
-      "recommended_dependencies" => dependencies.select(&:recommended?).map(&:name).uniq,
-      "optional_dependencies" => dependencies.select(&:optional?).map(&:name).uniq,
-      "build_dependencies" => dependencies.select(&:build?).map(&:name).uniq,
-      "conflicts_with" => conflicts.map(&:name),
-      "caveats" => caveats,
     }
 
-    hsh["requirements"] = requirements.map do |req|
-      {
-        "name" => req.name,
-        "cask" => req.cask,
-        "download" => req.download,
-      }
-    end
-
-    hsh["options"] = options.map do |opt|
-      { "option" => opt.flag, "description" => opt.description }
-    end
-
-    hsh["bottle"] = {}
     %w[stable devel].each do |spec_sym|
       next unless spec = send(spec_sym)
       next unless spec.bottle_defined?
@@ -1605,6 +1612,18 @@ class Formula
         }
       end
       hsh["bottle"][spec_sym] = bottle_info
+    end
+
+    hsh["options"] = options.map do |opt|
+      { "option" => opt.flag, "description" => opt.description }
+    end
+
+    hsh["requirements"] = requirements.map do |req|
+      {
+        "name" => req.name,
+        "cask" => req.cask,
+        "download" => req.download,
+      }
     end
 
     installed_kegs.each do |keg|

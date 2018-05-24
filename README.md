@@ -5,7 +5,7 @@ Features, usage and installation instructions are [summarised on the homepage](h
 
 ## What Packages Are Available?
 1. Type `brew search` for a list.
-2. Or visit [formulae.brew.sh](http://formulae.brew.sh) to browse packages online.
+2. Or visit [formulae.brew.sh](https://formulae.brew.sh) to browse packages online.
 3. Or use `brew search --desc <keyword>` to browse packages from the command line.
 
 ## More Documentation
@@ -90,10 +90,6 @@ Our physical hardware is hosted by [Commsworld](https://www.commsworld.com).
 Our bottles (binary packages) are hosted by [Bintray](https://bintray.com/homebrew).
 
 [![Downloads by Bintray](https://bintray.com/docs/images/downloads_by_bintray_96.png)](https://bintray.com/homebrew)
-
-[Our website](https://brew.sh) is hosted by [Netlify](https://www.netlify.com).
-
-[![Deploys by Netlify](https://www.netlify.com/img/global/badges/netlify-color-accent.svg)](https://www.netlify.com)
 
 Secure password storage and syncing provided by [1Password for Teams](https://1password.com/teams/) by [AgileBits](https://agilebits.com).
 
