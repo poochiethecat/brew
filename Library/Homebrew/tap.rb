@@ -46,6 +46,10 @@ class Tap
     nil
   end
 
+  def self.default_cask_tap
+    @default_cask_tap ||= fetch("Homebrew", "cask")
+  end
+
   extend Enumerable
 
   # The user name of this {Tap}. Usually, it's the Github username of
@@ -84,6 +88,7 @@ class Tap
   # clear internal cache
   def clear_cache
     @remote = nil
+    @repo_var = nil
     @formula_dir = nil
     @cask_dir = nil
     @formula_files = nil
@@ -109,6 +114,13 @@ class Tap
   # The default remote path to this {Tap}.
   def default_remote
     "https://github.com/#{full_name}"
+  end
+
+  def repo_var
+    @repo_var ||= path.to_s
+                      .strip_prefix(TAP_DIRECTORY.to_s)
+                      .tr("^A-Za-z0-9", "_")
+                      .upcase
   end
 
   # True if this {Tap} is a git repository.

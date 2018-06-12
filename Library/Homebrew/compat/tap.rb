@@ -5,8 +5,8 @@ class Tap
 
       return unless user == "caskroom"
 
-      # TODO: Remove this check after migration.
-      return unless repo == "tap-migration-test"
+      old_initial_revision_var = "HOMEBREW_UPDATE_BEFORE#{repo_var}"
+      old_current_revision_var = "HOMEBREW_UPDATE_AFTER#{repo_var}"
 
       new_user = "Homebrew"
       new_repo = (repo == "cask") ? repo : "cask-#{repo}"
@@ -15,9 +15,16 @@ class Tap
       old_path = path
       old_remote = path.git_origin
 
+      clear_cache
       super(new_user, new_repo)
 
-      return unless old_path.git?
+      return unless old_path.directory?
+
+      new_initial_revision_var = "HOMEBREW_UPDATE_BEFORE#{repo_var}"
+      new_current_revision_var = "HOMEBREW_UPDATE_AFTER#{repo_var}"
+
+      ENV[new_initial_revision_var] ||= ENV[old_initial_revision_var]
+      ENV[new_current_revision_var] ||= ENV[old_current_revision_var]
 
       new_name = name
       new_path = path
@@ -25,12 +32,14 @@ class Tap
 
       ohai "Migrating tap #{old_name} to #{new_name}..." if $stdout.tty?
 
+      if old_path.git?
+        puts "Changing remote from #{old_remote} to #{new_remote}..." if $stdout.tty?
+        old_path.git_origin = new_remote
+      end
+
       puts "Moving #{old_path} to #{new_path}..." if $stdout.tty?
       path.dirname.mkpath
       FileUtils.mv old_path, new_path
-
-      puts "Changing remote from #{old_remote} to #{new_remote}..." if $stdout.tty?
-      new_path.git_origin = new_remote
     end
   end
 

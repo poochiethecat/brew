@@ -66,12 +66,9 @@ module Homebrew
             #{Formatter.url("https://www.playframework.com/documentation/2.3.x/Highlights23")}
           EOS
         when "haskell-platform" then <<~EOS
-          We no longer package haskell-platform. Consider installing ghc
-          and cabal-install instead:
-            brew install ghc cabal-install
-
-          You can install with Homebrew-Cask:
-            brew cask install haskell-platform
+          We no longer package haskell-platform. Consider installing ghc,
+          cabal-install and stack instead:
+            brew install ghc cabal-install stack
           EOS
         when "mysqldump-secure" then <<~EOS
           The creator of mysqldump-secure tried to game our popularity metrics.
@@ -101,7 +98,7 @@ module Homebrew
           EOS
           break if new_tap_name == CoreTap.instance.name
 
-          install_cmd = if new_tap_user == "caskroom" || (new_tap_user == "homebrew" && new_tap_repo.start_with?("cask"))
+          install_cmd = if new_tap_name.start_with?("homebrew/cask")
             "cask install"
           else
             "install"

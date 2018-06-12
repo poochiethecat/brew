@@ -15,6 +15,7 @@ require "rubocop/rspec/support"
 require "find"
 
 $LOAD_PATH.unshift(File.expand_path("#{ENV["HOMEBREW_LIBRARY"]}/Homebrew"))
+$LOAD_PATH.unshift(File.expand_path("#{ENV["HOMEBREW_LIBRARY"]}/Homebrew/cask/lib"))
 $LOAD_PATH.unshift(File.expand_path("#{ENV["HOMEBREW_LIBRARY"]}/Homebrew/test/support/lib"))
 
 require "global"
@@ -41,7 +42,20 @@ TEST_DIRECTORIES = [
 RSpec.configure do |config|
   config.order = :random
 
+  config.raise_errors_for_deprecations!
+
   config.filter_run_when_matching :focus
+
+  config.silence_filter_announcements = true
+
+  # TODO: when https://github.com/rspec/rspec-expectations/pull/1056
+  #       makes it into a stable release:
+  # config.expect_with :rspec do |c|
+  #   c.max_formatted_output_length = 200
+  # end
+
+  # Never truncate output objects.
+  RSpec::Support::ObjectFormatter.default_instance.max_formatted_output_length = nil
 
   config.include(FileUtils)
 
@@ -124,7 +138,7 @@ RSpec.configure do |config|
         HOMEBREW_PREFIX/"share",
         HOMEBREW_PREFIX/"opt",
         HOMEBREW_PREFIX/"Caskroom",
-        HOMEBREW_LIBRARY/"Taps/caskroom",
+        HOMEBREW_LIBRARY/"Taps/homebrew/homebrew-cask",
         HOMEBREW_LIBRARY/"Taps/homebrew/homebrew-bar",
         HOMEBREW_LIBRARY/"Taps/homebrew/homebrew-bundle",
         HOMEBREW_LIBRARY/"Taps/homebrew/homebrew-foo",

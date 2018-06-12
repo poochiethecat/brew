@@ -12,7 +12,7 @@ A formula is a package definition written in Ruby. It can be created with `brew 
 | **Cellar**     | All **Kegs** are installed here                            | `/usr/local/Cellar`                                             |
 | **Tap**        | A Git repository of **Formulae** and/or commands | `/usr/local/Homebrew/Library/Taps/homebrew/homebrew-core`   |
 | **Bottle**     | Pre-built **Keg** used instead of building from source     | `qt-4.8.4.mavericks.bottle.tar.gz`                              |
-| **Cask**       | An [extension of homebrew](https://github.com/caskroom/homebrew-cask) to install macOS native apps  | `/Applications/MacDown.app/Contents/SharedSupport/bin/macdown` |
+| **Cask**       | An [extension of homebrew](https://github.com/Homebrew/homebrew-cask) to install macOS native apps  | `/Applications/MacDown.app/Contents/SharedSupport/bin/macdown` |
 | **Brew Bundle**| An [extension of homebrew](https://github.com/Homebrew/homebrew-bundle) to describe dependencies    | `brew 'myservice', restart_service: true` |
 
 ## An introduction
@@ -233,7 +233,7 @@ end
 
 [jrnl](https://github.com/Homebrew/homebrew-core/blob/master/Formula/jrnl.rb) is an example of a formula that does this well. The end result means the user doesn't have to use `pip` or Python and can just run `jrnl`.
 
-[homebrew-pypi-poet](https://github.com/tdsmith/homebrew-pypi-poet) can help you generate `resource` stanzas for the dependencies of your Python application and [gdm](https://github.com/sparrc/gdm#homebrew) can help you generate `go_resource` stanzas for the dependencies of your Go application.
+[homebrew-pypi-poet](https://github.com/tdsmith/homebrew-pypi-poet) can help you generate `resource` stanzas for the dependencies of your Python application.
 
 ### Install the formula
 

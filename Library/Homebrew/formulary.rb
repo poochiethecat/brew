@@ -277,6 +277,7 @@ module Formulary
   # * a formula URL
   # * a local bottle reference
   def self.factory(ref, spec = :stable, alias_path: nil, from: nil)
+    raise ArgumentError, "Formulae must have a ref!" unless ref
     loader_for(ref, from: from).get_formula(spec, alias_path: alias_path)
   end
 
@@ -295,6 +296,13 @@ module Formulary
     else
       factory(rack.basename.to_s, spec || :stable, alias_path: alias_path, from: :rack)
     end
+  end
+
+  # Return whether given rack is keg-only
+  def self.keg_only?(rack)
+    Formulary.from_rack(rack).keg_only?
+  rescue FormulaUnavailableError, TapFormulaAmbiguityError, TapFormulaWithOldnameAmbiguityError
+    false
   end
 
   # Return a Formula instance for the given keg.

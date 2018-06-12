@@ -43,7 +43,7 @@ require "utils/curl"
 require "extend/ENV"
 require "formula_cellar_checks"
 require "cmd/search"
-require "cmd/style"
+require "style"
 require "date"
 require "missing_formula"
 require "digest"
@@ -53,7 +53,7 @@ module Homebrew
   module_function
 
   def audit
-    args = Homebrew::CLI::Parser.parse do
+    Homebrew::CLI::Parser.parse do
       switch      "--strict"
       switch      "--online"
       switch      "--new-formula"
@@ -116,7 +116,7 @@ module Homebrew
 
     options[:display_cop_names] = args.display_cop_names?
     # Check style in a single batch run up front for performance
-    style_results = check_style_json(files, options)
+    style_results = Style.check_style_json(files, options)
 
     new_formula_problem_lines = []
     ff.sort.each do |f|
@@ -515,9 +515,9 @@ module Homebrew
 
       new_formula_problem "GitHub fork (not canonical repository)" if metadata["fork"]
       if formula&.tap&.core_tap? &&
-         (metadata["forks_count"] < 20) && (metadata["subscribers_count"] < 20) &&
-         (metadata["stargazers_count"] < 50)
-        new_formula_problem "GitHub repository not notable enough (<20 forks, <20 watchers and <50 stars)"
+         (metadata["forks_count"] < 30) && (metadata["subscribers_count"] < 30) &&
+         (metadata["stargazers_count"] < 75)
+        new_formula_problem "GitHub repository not notable enough (<30 forks, <30 watchers and <75 stars)"
       end
 
       return if Date.parse(metadata["created_at"]) <= (Date.today - 30)
@@ -575,6 +575,21 @@ module Homebrew
         new_formula_problem "Formulae should not have a HEAD spec"
       end
 
+      throttled = %w[
+        aws-sdk-cpp 10
+        awscli 10
+        heroku 10
+        quicktype 10
+        vim 50
+      ]
+
+      throttled.each_slice(2).to_a.map do |a, b|
+        version = formula.stable.version.to_s.split(".").last.to_i
+        if @strict && a.include?(formula.name) && version.modulo(b.to_i).nonzero?
+          problem "should only be updated every #{b} releases on multiples of #{b}"
+        end
+      end
+
       unstable_whitelist = %w[
         aalib 1.4rc5
         angolmois 2.0.0alpha2
@@ -606,6 +621,7 @@ module Homebrew
         libart 2.3.21
         pygtkglext 1.1.0
         libepoxy 1.5.0
+        gtk-mac-integration 2.1.2
       ].each_slice(2).to_a.map do |formula, version|
         [formula, version.split(".")[0..1].join(".")]
       end
