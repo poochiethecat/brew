@@ -2,6 +2,9 @@ require "optparse"
 require "shellwords"
 
 require "extend/optparse"
+
+require "hbc/config"
+
 require "hbc/cli/options"
 
 require "hbc/cli/abstract_command"
@@ -18,7 +21,6 @@ require "hbc/cli/install"
 require "hbc/cli/list"
 require "hbc/cli/outdated"
 require "hbc/cli/reinstall"
-require "hbc/cli/search"
 require "hbc/cli/style"
 require "hbc/cli/uninstall"
 require "hbc/cli/upgrade"
@@ -27,7 +29,6 @@ require "hbc/cli/zap"
 
 require "hbc/cli/abstract_internal_command"
 require "hbc/cli/internal_audit_modified_casks"
-require "hbc/cli/internal_appcast_checkpoint"
 require "hbc/cli/internal_dump"
 require "hbc/cli/internal_help"
 require "hbc/cli/internal_stanza"

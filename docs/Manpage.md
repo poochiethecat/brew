@@ -406,10 +406,10 @@ With `--verbose` or `-v`, many commands print extra debugging information. Note 
   * `search` [`--desc`] (`text`|`/``text``/`):
     Perform a substring search of formula names for `text`. If `text` is
     surrounded with slashes, then it is interpreted as a regular expression.
-    The search for `text` is extended online to some popular taps.
+    The search for `text` is extended online to official taps.
 
-    If `--desc` is passed, browse available packages matching `text` including a
-    description for each.
+    If `--desc` is passed, search formulae with a description matching `text` and
+    casks with a name matching `text`.
 
   * `search` (`--debian`|`--fedora`|`--fink`|`--macports`|`--opensuse`|`--ubuntu`) `text`:
     Search for `text` in the given package manager's list.
@@ -1166,6 +1166,10 @@ Note that environment variables must have a value set to be detected. For exampl
     a Homebrew-built Git if installed, or the system-provided binary.
 
     Set this to force Homebrew to use a particular git binary.
+
+  * `HOMEBREW_FORCE_BREWED_GIT`:
+    If set, Homebrew will use a Homebrew-installed `git` rather than the
+    system version.
 
   * `HOMEBREW_GITHUB_API_TOKEN`:
     A personal access token for the GitHub API, which you can create at
