@@ -1,6 +1,7 @@
 require "download_strategy"
 require "checksum"
 require "version"
+require "mktemp"
 
 # Resource is the fundamental representation of an external resource. The
 # primary formula download, along with other declared resources, are instances
@@ -81,7 +82,7 @@ class Resource
   # Verifies download and unpacks it
   # The block may call `|resource,staging| staging.retain!` to retain the staging
   # directory. Subclasses that override stage should implement the tmp
-  # dir using FileUtils.mktemp so that works with all subtypes.
+  # dir using Resource#mktemp so that works with all subtypes.
   def stage(target = nil, &block)
     unless target || block
       raise ArgumentError, "target directory or block is required"
@@ -118,7 +119,7 @@ class Resource
       if block_given?
         yield ResourceStageContext.new(self, staging)
       elsif target
-        target = Pathname.new(target) unless target.is_a? Pathname
+        target = Pathname(target)
         target.install Pathname.pwd.children
       end
     end
@@ -179,6 +180,14 @@ class Resource
   def patch(strip = :p1, src = nil, &block)
     p = Patch.create(strip, src, &block)
     patches << p
+  end
+
+  protected
+
+  def mktemp(prefix)
+    Mktemp.new(prefix).run do |staging|
+      yield staging
+    end
   end
 
   private

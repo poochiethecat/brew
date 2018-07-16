@@ -70,20 +70,6 @@ describe Hbc::DSL, :cask do
         expect(cask.version.to_s).to eq("1.2.3")
       end
     end
-
-    context "when it contains a deprecated DSL version", :needs_compat do
-      let(:token) { "compat/with-dsl-version" }
-
-      it "may use deprecated DSL version hash syntax" do
-        allow(ENV).to receive(:[]).with("HOMEBREW_DEVELOPER").and_return(nil)
-        allow(ENV).to receive(:[]).with("HOMEBREW_NO_COLOR").and_return(nil)
-
-        expect(cask.token).to eq("with-dsl-version")
-        expect(cask.url.to_s).to eq("http://example.com/TestCask.dmg")
-        expect(cask.homepage).to eq("http://example.com/")
-        expect(cask.version.to_s).to eq("1.2.3")
-      end
-    end
   end
 
   describe "name stanza" do
@@ -520,7 +506,7 @@ describe Hbc::DSL, :cask do
       it "allows installer manual to be specified" do
         installer = cask.artifacts.first
         expect(installer).to be_a(Hbc::Artifact::Installer::ManualInstaller)
-        expect(installer.path).to eq(cask.staged_path.join("Caffeine.app"))
+        expect(installer.path).to eq(Pathname("Caffeine.app"))
       end
     end
   end

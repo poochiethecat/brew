@@ -134,10 +134,8 @@ class Pathname
   end
   private :install_symlink_p
 
-  if method_defined?(:write)
-    # @private
-    alias old_write write
-  end
+  # @private
+  alias old_write write
 
   # we assume this pathname object is a file obviously
   def write(content, *open_args)
@@ -150,18 +148,6 @@ class Pathname
   def append_lines(content, *open_args)
     raise "Cannot append file that doesn't exist: #{self}" unless exist?
     open("a", *open_args) { |f| f.puts(content) }
-  end
-
-  unless method_defined?(:binwrite)
-    def binwrite(contents, *open_args)
-      open("wb", *open_args) { |f| f.write(contents) }
-    end
-  end
-
-  unless method_defined?(:binread)
-    def binread(*open_args)
-      open("rb", *open_args, &:read)
-    end
   end
 
   # NOTE always overwrites
@@ -264,66 +250,13 @@ class Pathname
   end
 
   # @private
-  def compression_type
-    case extname
-    when ".jar", ".war"
-      # Don't treat jars or wars as compressed
-      return
-    when ".gz"
-      # If the filename ends with .gz not preceded by .tar
-      # then we want to gunzip but not tar
-      return :gzip_only
-    when ".bz2"
-      return :bzip2_only
-    when ".lha", ".lzh"
-      return :lha
-    end
-
-    # Get enough of the file to detect common file types
-    # POSIX tar magic has a 257 byte offset
-    # magic numbers stolen from /usr/share/file/magic/
-    case open("rb") { |f| f.read(262) }
-    when /^PK\003\004/n         then :zip
-    when /^\037\213/n           then :gzip
-    when /^BZh/n                then :bzip2
-    when /^\037\235/n           then :compress
-    when /^.{257}ustar/n        then :tar
-    when /^\xFD7zXZ\x00/n       then :xz
-    when /^LZIP/n               then :lzip
-    when /^Rar!/n               then :rar
-    when /^7z\xBC\xAF\x27\x1C/n then :p7zip
-    when /^xar!/n               then :xar
-    when /^\xed\xab\xee\xdb/n   then :rpm
-    else
-      # This code so that bad-tarballs and zips produce good error messages
-      # when they don't unarchive properly.
-      case extname
-      when ".tar.gz", ".tgz", ".tar.bz2", ".tbz" then :tar
-      when ".zip" then :zip
-      end
-    end
-  end
-
-  # @private
   def text_executable?
     /^#!\s*\S+/ =~ open("r") { |f| f.read(1024) }
   end
 
-  # @private
-  def incremental_hash(klass)
-    digest = klass.new
-    if digest.respond_to?(:file)
-      digest.file(self)
-    else
-      buf = ""
-      open("rb") { |f| digest << buf while f.read(16384, buf) }
-    end
-    digest.hexdigest
-  end
-
   def sha256
     require "digest/sha2"
-    incremental_hash(Digest::SHA256)
+    Digest::SHA256.file(self).hexdigest
   end
 
   def verify_checksum(expected)
@@ -332,7 +265,7 @@ class Pathname
     raise ChecksumMismatchError.new(self, expected, actual) unless expected == actual
   end
 
-  alias to_str to_s unless method_defined?(:to_str)
+  alias to_str to_s
 
   def cd
     Dir.chdir(self) { yield self }
@@ -361,15 +294,6 @@ class Pathname
   def make_relative_symlink(src)
     dirname.mkpath
     File.symlink(src.relative_path_from(dirname), self)
-  end
-
-  unless method_defined?(:/)
-    def /(other)
-      if !other.respond_to?(:to_str) && !other.respond_to?(:to_path)
-        odisabled "Pathname#/ with #{other.class}", "a String or a Pathname"
-      end
-      join(other.to_s)
-    end
   end
 
   # @private
@@ -404,10 +328,10 @@ class Pathname
     mkpath
     targets.each do |target|
       target = Pathname.new(target) # allow pathnames or strings
-      join(target.basename).write <<~EOS
+      join(target.basename).write <<~SH
         #!/bin/bash
         exec "#{target}" "$@"
-      EOS
+      SH
     end
   end
 
@@ -416,10 +340,10 @@ class Pathname
     env_export = ""
     env.each { |key, value| env_export += "#{key}=\"#{value}\" " }
     dirname.mkpath
-    write <<~EOS
+    write <<~SH
       #!/bin/bash
       #{env_export}exec "#{target}" "$@"
-    EOS
+    SH
   end
 
   # Writes a wrapper env script and moves all files to the dst
@@ -439,10 +363,10 @@ class Pathname
     java_home = if java_version
       "JAVA_HOME=\"$(#{Language::Java.java_home_cmd(java_version)})\" "
     end
-    join(script_name).write <<~EOS
+    join(script_name).write <<~SH
       #!/bin/bash
       #{java_home}exec java #{java_opts} -jar #{target_jar} "$@"
-    EOS
+    SH
   end
 
   def install_metafiles(from = Pathname.pwd)

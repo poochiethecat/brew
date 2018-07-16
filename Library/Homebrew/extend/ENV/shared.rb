@@ -54,6 +54,10 @@ module SharedEnvExtension
     remove CC_FLAG_VARS, val
   end
 
+  def append_to_cccfg(value)
+    append("HOMEBREW_CCCFG", value, "")
+  end
+
   def append(keys, value, separator = " ")
     value = value.to_s
     Array(keys).each do |key|
@@ -147,7 +151,7 @@ module SharedEnvExtension
 
   # Outputs the current compiler.
   # @return [Symbol]
-  # <pre># Do something only for clang
+  # <pre># Do something only for the system clang
   # if ENV.compiler == :clang
   #   # modify CFLAGS CXXFLAGS OBJCFLAGS OBJCXXFLAGS in one go:
   #   ENV.append_to_cflags "-I ./missing/includes"
@@ -301,6 +305,18 @@ module SharedEnvExtension
   # A no-op until we enable this by default again (which we may never do).
   def permit_weak_imports; end
 
+  # @private
+  def compiler_any_clang?(cc = compiler)
+    %w[clang llvm_clang].include?(cc.to_s)
+  end
+
+  # @private
+  def compiler_with_cxx11_support?(cc)
+    return if compiler_any_clang?(cc)
+    version = cc[/^gcc-(\d+(?:\.\d+)?)$/, 1]
+    version && Version.create(version) >= Version.create("4.8")
+  end
+
   private
 
   def cc=(val)
@@ -329,11 +345,6 @@ module SharedEnvExtension
   def check_for_compiler_universal_support
     return unless homebrew_cc =~ GNU_GCC_REGEXP
     raise "Non-Apple GCC can't build universal binaries"
-  end
-
-  def gcc_with_cxx11_support?(cc)
-    version = cc[/^gcc-(\d+(?:\.\d+)?)$/, 1]
-    version && Version.create(version) >= Version.create("4.8")
   end
 end
 

@@ -333,10 +333,10 @@ describe Hbc::Audit, :cask do
       end
     end
 
-    describe "GitHub releases appcast check" do
-      let(:appcast_warning) { /Download uses GitHub releases/ }
+    describe "hosting with appcast checks" do
+      let(:appcast_warning) { /please add an appcast/ }
 
-      context "when the download does not use GitHub releases" do
+      context "when the download does not use hosting with an appcast" do
         let(:cask_token) { "basic-cask" }
 
         it { is_expected.not_to warn_with(appcast_warning) }
@@ -353,16 +353,6 @@ describe Hbc::Audit, :cask do
 
         it { is_expected.to warn_with(appcast_warning) }
       end
-    end
-
-    describe "SourceForge appcast check" do
-      let(:appcast_warning) { /Download is hosted on SourceForge/ }
-
-      context "when the download is not hosted on SourceForge" do
-        let(:cask_token) { "basic-cask" }
-
-        it { is_expected.not_to warn_with(appcast_warning) }
-      end
 
       context "when the download is hosted on SourceForge and has an appcast" do
         let(:cask_token) { "sourceforge-with-appcast" }
@@ -372,6 +362,30 @@ describe Hbc::Audit, :cask do
 
       context "when the download is hosted on SourceForge and does not have an appcast" do
         let(:cask_token) { "sourceforge-correct-url-format" }
+
+        it { is_expected.to warn_with(appcast_warning) }
+      end
+
+      context "when the download is hosted on DevMate and has an appcast" do
+        let(:cask_token) { "devmate-with-appcast" }
+
+        it { is_expected.not_to warn_with(appcast_warning) }
+      end
+
+      context "when the download is hosted on DevMate and does not have an appcast" do
+        let(:cask_token) { "devmate-without-appcast" }
+
+        it { is_expected.to warn_with(appcast_warning) }
+      end
+
+      context "when the download is hosted on HockeyApp and has an appcast" do
+        let(:cask_token) { "hockeyapp-with-appcast" }
+
+        it { is_expected.not_to warn_with(appcast_warning) }
+      end
+
+      context "when the download is hosted on HockeyApp and does not have an appcast" do
+        let(:cask_token) { "hockeyapp-without-appcast" }
 
         it { is_expected.to warn_with(appcast_warning) }
       end
@@ -394,6 +408,34 @@ describe Hbc::Audit, :cask do
 
       context "when the Cask is :latest and has an appcast" do
         let(:cask_token) { "latest-with-appcast" }
+
+        it { is_expected.to warn_with(warning_msg) }
+      end
+    end
+
+    describe "latest with auto_updates checks" do
+      let(:warning_msg) { "Casks with `version :latest` should not use `auto_updates`" }
+
+      context "when the Cask is :latest and does not have auto_updates" do
+        let(:cask_token) { "version-latest" }
+
+        it { is_expected.not_to warn_with(warning_msg) }
+      end
+
+      context "when the Cask is versioned and does not have auto_updates" do
+        let(:cask_token) { "basic-cask" }
+
+        it { is_expected.not_to warn_with(warning_msg) }
+      end
+
+      context "when the Cask is versioned and has auto_updates" do
+        let(:cask_token) { "auto-updates" }
+
+        it { is_expected.not_to warn_with(warning_msg) }
+      end
+
+      context "when the Cask is :latest and has auto_updates" do
+        let(:cask_token) { "latest-with-auto-updates" }
 
         it { is_expected.to warn_with(warning_msg) }
       end

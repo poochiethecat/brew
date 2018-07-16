@@ -1,4 +1,4 @@
-#:  * `install` [`--debug`] [`--env=`(`std`|`super`)] [`--ignore-dependencies`|`--only-dependencies`] [`--cc=`<compiler>] [`--build-from-source`|`--force-bottle`] [`--include-test`] [`--devel`|`--HEAD`] [`--keep-tmp`] [`--build-bottle`] [`--force`] [`--verbose`] <formula> [<options> ...]:
+#:  * `install` [`--debug`] [`--env=`(`std`|`super`)] [`--ignore-dependencies`|`--only-dependencies`] [`--cc=`<compiler>] [`--build-from-source`|`--force-bottle`] [`--include-test`] [`--devel`|`--HEAD`] [`--keep-tmp`] [`--build-bottle`] [`--force`] [`--verbose`] [`--display-times`] <formula> [<options> ...]:
 #:    Install <formula>.
 #:
 #:    <formula> is usually the name of the formula to install, but it can be specified
@@ -21,8 +21,12 @@
 #:
 #:    If `--cc=`<compiler> is passed, attempt to compile using <compiler>.
 #:    <compiler> should be the name of the compiler's executable, for instance
-#:    `gcc-4.2` for Apple's GCC 4.2, or `gcc-4.9` for a Homebrew-provided GCC
-#:    4.9.
+#:    `gcc-8` for gcc 8, `gcc-4.2` for Apple's GCC 4.2, or `gcc-4.9` for a
+#:    Homebrew-provided GCC 4.9. In order to use LLVM's clang, use
+#:    `llvm_clang`. To specify the Apple-provided clang, use `clang`. This
+#:    parameter will only accept compilers that are provided by Homebrew or
+#:    bundled with macOS. Please do not file issues if you encounter errors
+#:    while using this flag.
 #:
 #:    If `--build-from-source` (or `-s`) is passed, compile the specified <formula> from
 #:    source even if a bottle is provided. Dependencies will still be installed
@@ -54,6 +58,9 @@
 #:    installed keg-only or non-migrated versions
 #:
 #:    If `--verbose` (or `-v`) is passed, print the verification and postinstall steps.
+#:
+#:    If `--display-times` is passed, install times for each formula are printed
+#:    at the end of the run.
 #:
 #:    Installation options specific to <formula> may be appended to the command,
 #:    and can be listed with `brew options` <formula>.
@@ -245,6 +252,7 @@ module Homebrew
         Migrator.migrate_if_needed(f)
         install_formula(f)
       end
+      Homebrew.messages.display_messages
     rescue FormulaUnreadableError, FormulaClassUnavailableError,
            TapFormulaUnreadableError, TapFormulaClassUnavailableError => e
       # Need to rescue before `FormulaUnavailableError` (superclass of this)

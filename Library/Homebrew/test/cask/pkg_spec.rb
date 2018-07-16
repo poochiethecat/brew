@@ -123,7 +123,7 @@ describe Hbc::Pkg, :cask do
     end
 
     let(:pkg_info_plist) do
-      <<~EOS
+      <<~XML
         <?xml version="1.0" encoding="UTF-8"?>
         <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
         <plist version="1.0">
@@ -138,7 +138,7 @@ describe Hbc::Pkg, :cask do
           </dict>
         </dict>
         </plist>
-      EOS
+      XML
     end
 
     it "correctly parses a Property List" do
@@ -146,7 +146,7 @@ describe Hbc::Pkg, :cask do
 
       expect(fake_system_command).to receive(:run!).with(
         "/usr/sbin/pkgutil",
-      args: ["--pkg-info-plist", pkg_id],
+        args: ["--pkg-info-plist", pkg_id],
       ).and_return(
         Hbc::SystemCommand::Result.new(nil, pkg_info_plist, nil, 0),
       )

@@ -14,6 +14,7 @@ require "development_tools"
 require "cache_store"
 require "linkage_checker"
 require "install"
+require "messages"
 
 class FormulaInstaller
   include FormulaCellarChecks
@@ -220,6 +221,7 @@ class FormulaInstaller
   end
 
   def install
+    start_time = Time.now
     if !formula.bottle_unneeded? && !pour_bottle? && DevelopmentTools.installed?
       Homebrew::Install.check_development_tools
     end
@@ -348,6 +350,8 @@ class FormulaInstaller
     build_bottle_postinstall if build_bottle?
 
     opoo "Nothing was installed to #{formula.prefix}" unless formula.installed?
+    end_time = Time.now
+    Homebrew.messages.formula_installed(formula, end_time - start_time)
   end
 
   def check_conflicts
@@ -436,8 +440,12 @@ class FormulaInstaller
 
   def expand_requirements
     unsatisfied_reqs = Hash.new { |h, k| h[k] = [] }
-    deps = []
+    req_deps = []
     formulae = [formula]
+    formula_deps_map = Dependency.expand(formula)
+                                 .each_with_object({}) do |dep, hash|
+      hash[dep.name] = dep
+    end
 
     while f = formulae.pop
       runtime_requirements = runtime_requirements(f)
@@ -453,6 +461,8 @@ class FormulaInstaller
           next
         elsif !runtime_requirements.include?(req) && install_bottle_for_dependent
           Requirement.prune
+        elsif (dep = formula_deps_map[dependent.name]) && dep.build?
+          Requirement.prune
         else
           unsatisfied_reqs[dependent] << req
         end
@@ -460,13 +470,14 @@ class FormulaInstaller
     end
 
     # Merge the repeated dependencies, which may have different tags.
-    deps = Dependency.merge_repeats(deps)
+    req_deps = Dependency.merge_repeats(req_deps)
 
-    [unsatisfied_reqs, deps]
+    [unsatisfied_reqs, req_deps]
   end
 
   def expand_dependencies(deps)
     inherited_options = Hash.new { |hash, key| hash[key] = Options.new }
+    pour_bottle = pour_bottle?
 
     expanded_deps = Dependency.expand(formula, deps) do |dependent, dep|
       inherited_options[dep.name] |= inherited_options_for(dep)
@@ -474,6 +485,7 @@ class FormulaInstaller
         dependent,
         inherited_options.fetch(dependent.name, []),
       )
+      pour_bottle = true if install_bottle_for?(dep.to_formula, build)
 
       if dep.prune_from_option?(build)
         Dependency.prune
@@ -486,6 +498,16 @@ class FormulaInstaller
       elsif dep.satisfied?(inherited_options[dep.name])
         Dependency.skip
       end
+    end
+
+    if pour_bottle
+      bottle_deps = Keg.relocation_formulae
+                       .map { |formula| Dependency.new(formula) }
+                       .reject do |dep|
+        inherited_options[dep.name] |= inherited_options_for(dep)
+        dep.satisfied? inherited_options[dep.name]
+      end
+      expanded_deps = Dependency.merge_repeats(bottle_deps + expanded_deps) unless bottle_deps.empty?
     end
 
     expanded_deps.map { |dep| [dep, inherited_options[dep.name]] }
@@ -586,6 +608,7 @@ class FormulaInstaller
     return if caveats.empty?
     @show_summary_heading = true
     ohai "Caveats", caveats.to_s
+    Homebrew.messages.record_caveats(formula, caveats)
   end
 
   def finish
@@ -722,6 +745,8 @@ class FormulaInstaller
         sandbox.allow_write_path(ENV["HOME"]) if ARGV.interactive?
         sandbox.allow_write_temp_and_cache
         sandbox.allow_write_log(formula)
+        sandbox.allow_cvs
+        sandbox.allow_fossil
         sandbox.allow_write_xcode
         sandbox.allow_write_cellar(formula)
         sandbox.exec(*args)

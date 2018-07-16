@@ -20,7 +20,7 @@ module Hbc
 
     def run!
       @processed_output = { stdout: "", stderr: "" }
-      odebug "Executing: #{expanded_command}"
+      odebug command.shelljoin
 
       each_output_line do |type, line|
         case type
@@ -37,7 +37,7 @@ module Hbc
       result
     end
 
-    def initialize(executable, args: [], sudo: false, input: [], print_stdout: false, print_stderr: true, must_succeed: false, path: ENV["PATH"], **options)
+    def initialize(executable, args: [], sudo: false, input: [], print_stdout: false, print_stderr: true, must_succeed: false, env: {}, **options)
       @executable = executable
       @args = args
       @sudo = sudo
@@ -47,18 +47,34 @@ module Hbc
       @must_succeed = must_succeed
       options.extend(HashValidator).assert_valid_keys(:chdir)
       @options = options
-      @path = path
+      @env = env
+
+      @env.keys.grep_v(/^[\w&&\D]\w*$/) do |name|
+        raise ArgumentError, "Invalid variable name: '#{name}'"
+      end
     end
 
     def command
-      [*sudo_prefix, executable, *args]
+      [*sudo_prefix, *env_args, executable.to_s, *expanded_args]
     end
 
     private
 
-    attr_reader :executable, :args, :input, :options, :processed_output, :processed_status, :path
+    attr_reader :executable, :args, :input, :options, :processed_output, :processed_status, :env
 
     attr_predicate :sudo?, :print_stdout?, :print_stderr?, :must_succeed?
+
+    def env_args
+      return [] if env.empty?
+
+      variables = env.map do |name, value|
+        sanitized_name = Shellwords.escape(name)
+        sanitized_value = Shellwords.escape(value)
+        "#{sanitized_name}=#{sanitized_value}"
+      end
+
+      ["env", *variables]
+    end
 
     def sudo_prefix
       return [] unless sudo?
@@ -71,21 +87,23 @@ module Hbc
       raise CaskCommandFailedError.new(command, processed_output[:stdout], processed_output[:stderr], processed_status)
     end
 
-    def expanded_command
-      @expanded_command ||= command.map do |arg|
+    def expanded_args
+      @expanded_args ||= args.map do |arg|
         if arg.respond_to?(:to_path)
           File.absolute_path(arg)
+        elsif arg.is_a?(Integer) || arg.is_a?(Float)
+          arg.to_s
         else
-          String(arg)
+          arg.to_str
         end
       end
     end
 
     def each_output_line(&b)
-      executable, *args = expanded_command
+      executable, *args = command
 
       raw_stdin, raw_stdout, raw_stderr, raw_wait_thr =
-        Open3.popen3({ "PATH" => path }, [executable, executable], *args, **options)
+        Open3.popen3([executable, executable], *args, **options)
 
       write_input_to(raw_stdin)
       raw_stdin.close_write
@@ -137,48 +155,35 @@ module Hbc
         @exit_status = exit_status
       end
 
-      def plist
-        @plist ||= self.class._parse_plist(@command, @stdout.dup)
-      end
-
       def success?
         @exit_status.zero?
       end
 
-      def merged_output
-        @merged_output ||= @stdout + @stderr
-      end
+      def plist
+        @plist ||= begin
+          output = stdout
 
-      def to_s
-        @stdout
-      end
+          if /\A(?<garbage>.*?)<\?\s*xml/m =~ output
+            output = output.sub(/\A#{Regexp.escape(garbage)}/m, "")
+            warn_plist_garbage(garbage)
+          end
 
-      def self._warn_plist_garbage(command, garbage)
-        return true unless garbage =~ /\S/
-        external = File.basename(command.first)
-        lines = garbage.strip.split("\n")
-        opoo "Non-XML stdout from #{external}:"
-        $stderr.puts lines.map { |l| "    #{l}" }
-      end
+          if %r{<\s*/\s*plist\s*>(?<garbage>.*?)\Z}m =~ output
+            output = output.sub(/#{Regexp.escape(garbage)}\Z/, "")
+            warn_plist_garbage(garbage)
+          end
 
-      def self._parse_plist(command, output)
-        raise CaskError, "Empty plist input" unless output =~ /\S/
-        output.sub!(/\A(.*?)(<\?\s*xml)/m, '\2')
-        _warn_plist_garbage(command, Regexp.last_match[1]) if ARGV.debug?
-        output.sub!(%r{(<\s*/\s*plist\s*>)(.*?)\Z}m, '\1')
-        _warn_plist_garbage(command, Regexp.last_match[2])
-        xml = Plist.parse_xml(output)
-        unless xml.respond_to?(:keys) && !xml.keys.empty?
-          raise CaskError, <<~EOS
-            Empty result parsing plist output from command.
-              command was:
-              #{command}
-              output we attempted to parse:
-              #{output}
-          EOS
+          Plist.parse_xml(output)
         end
-        xml
       end
+
+      def warn_plist_garbage(garbage)
+        return unless ARGV.verbose?
+        return unless garbage =~ /\S/
+        opoo "Received non-XML output from #{Formatter.identifier(command.first)}:"
+        $stderr.puts garbage.strip
+      end
+      private :warn_plist_garbage
     end
   end
 end

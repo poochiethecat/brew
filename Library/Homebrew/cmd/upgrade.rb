@@ -1,4 +1,4 @@
-#:  * `upgrade` [<install-options>] [`--cleanup`] [`--fetch-HEAD`] [`--ignore-pinned`] [<formulae>]:
+#:  * `upgrade` [<install-options>] [`--cleanup`] [`--fetch-HEAD`] [`--ignore-pinned`] [`--display-times`] [<formulae>]:
 #:    Upgrade outdated, unpinned brews (with existing install options).
 #:
 #:    Options for the `install` command are also valid here.
@@ -14,6 +14,9 @@
 #:    If `--ignore-pinned` is passed, set a 0 exit code even if pinned formulae
 #:    are not upgraded.
 #:
+#:    If `--display-times` is passed, install times for each formula are printed
+#:    at the end of the run.
+#:
 #:    If <formulae> are given, upgrade only the specified brews (unless they
 #:    are pinned; see `pin`, `unpin`).
 
@@ -21,6 +24,7 @@ require "install"
 require "formula_installer"
 require "cleanup"
 require "development_tools"
+require "messages"
 
 module Homebrew
   module_function
@@ -29,8 +33,6 @@ module Homebrew
     FormulaInstaller.prevent_build_flags unless DevelopmentTools.installed?
 
     Install.perform_preinstall_checks
-
-    odisabled "'brew upgrade --all'", "'brew upgrade'" if ARGV.include?("--all")
 
     if ARGV.named.empty?
       outdated = Formula.installed.select do |f|
@@ -102,6 +104,7 @@ module Homebrew
         onoe "#{f}: #{e}"
       end
     end
+    Homebrew.messages.display_messages
   end
 
   def upgrade_formula(f)

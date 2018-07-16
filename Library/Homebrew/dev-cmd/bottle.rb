@@ -42,7 +42,7 @@ require "erb"
 
 BOTTLE_ERB = <<-EOS.freeze
   bottle do
-    <% if !root_url.start_with?(BottleSpecification::DEFAULT_DOMAIN) %>
+    <% if !root_url.start_with?(HOMEBREW_BOTTLE_DEFAULT_DOMAIN) %>
     root_url "<%= root_url %>"
     <% end %>
     <% if prefix != BottleSpecification::DEFAULT_PREFIX %>
@@ -87,8 +87,17 @@ module Homebrew
     end
 
     return merge if args.merge?
+    ensure_relocation_formulae_installed!
     ARGV.resolved_formulae.each do |f|
       bottle_formula f
+    end
+  end
+
+  def ensure_relocation_formulae_installed!
+    Keg.relocation_formulae.each do |f|
+      next if Formula[f].installed?
+      ohai "Installing #{f}..."
+      safe_system HOMEBREW_BREW_FILE, "install", f
     end
   end
 
@@ -481,8 +490,7 @@ module Homebrew
               indent = s.slice(/^( +)stable do/, 1).length
               string = s.sub!(/^ {#{indent}}stable do(.|\n)+?^ {#{indent}}end\n/m, '\0' + output + "\n")
             else
-              string = s.sub!(
-                /(
+              pattern = /(
                   (\ {2}\#[^\n]*\n)*                                             # comments
                   \ {2}(                                                         # two spaces at the beginning
                     (url|head)\ ['"][\S\ ]+['"]                                  # url or head with a string
@@ -494,8 +502,8 @@ module Homebrew
                     revision\ \d+                                                # revision with a number
                   )\n+                                                           # multiple empty lines
                  )+
-               /mx, '\0' + output + "\n"
-              )
+               /mx
+              string = s.sub!(pattern, '\0' + output + "\n")
             end
             odie "Bottle block addition failed!" unless string
           end

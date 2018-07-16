@@ -15,6 +15,11 @@ describe Hbc::Artifact::Pkg, :cask do
         args: ["-pkg", cask.staged_path.join("MyFancyPkg", "Fancy.pkg"), "-target", "/"],
         sudo: true,
         print_stdout: true,
+        env: {
+          "LOGNAME" => ENV["USER"],
+          "USER" => ENV["USER"],
+          "USERNAME" => ENV["USER"],
+        },
       )
 
       pkg.install_phase(command: fake_system_command)
@@ -29,7 +34,7 @@ describe Hbc::Artifact::Pkg, :cask do
 
       file = double(path: Pathname.new("/tmp/choices.xml"))
 
-      expect(file).to receive(:write).with(<<~EOS)
+      expect(file).to receive(:write).with <<~XML
         <?xml version="1.0" encoding="UTF-8"?>
         <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
         <plist version="1.0">
@@ -44,7 +49,7 @@ describe Hbc::Artifact::Pkg, :cask do
         \t</dict>
         </array>
         </plist>
-      EOS
+      XML
 
       expect(file).to receive(:close)
       expect(file).to receive(:unlink)
@@ -55,6 +60,11 @@ describe Hbc::Artifact::Pkg, :cask do
         args: ["-pkg", cask.staged_path.join("MyFancyPkg", "Fancy.pkg"), "-target", "/", "-applyChoiceChangesXML", cask.staged_path.join("/tmp/choices.xml")],
         sudo: true,
         print_stdout: true,
+        env: {
+          "LOGNAME" => ENV["USER"],
+          "USER" => ENV["USER"],
+          "USERNAME" => ENV["USER"],
+        },
       )
 
       pkg.install_phase(command: fake_system_command)

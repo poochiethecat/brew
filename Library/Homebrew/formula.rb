@@ -17,6 +17,7 @@ require "linkage_checker"
 require "extend/ENV"
 require "language/python"
 require "tab"
+require "mktemp"
 
 # A formula provides instructions and metadata for Homebrew to install a piece
 # of software. Every Homebrew formula is a {Formula}.
@@ -1518,7 +1519,7 @@ class Formula
 
   # Returns a list of Dependency objects that are required at runtime.
   # @private
-  def runtime_dependencies(read_from_tab: true)
+  def runtime_dependencies(read_from_tab: true, undeclared: true)
     if read_from_tab &&
        (keg = opt_or_installed_prefix_keg) &&
        (tab_deps = keg.runtime_dependencies)
@@ -1529,6 +1530,7 @@ class Formula
       end.compact
     end
 
+    return declared_runtime_dependencies unless undeclared
     declared_runtime_dependencies | undeclared_runtime_dependencies
   end
 
@@ -1737,10 +1739,10 @@ class Formula
     # keep Homebrew's site-packages in sys.path when using system Python
     user_site_packages = home/"Library/Python/2.7/lib/python/site-packages"
     user_site_packages.mkpath
-    (user_site_packages/"homebrew.pth").write <<~EOS
+    (user_site_packages/"homebrew.pth").write <<~PYTHON
       import site; site.addsitedir("#{HOMEBREW_PREFIX}/lib/python2.7/site-packages")
       import sys, os; sys.path = (os.environ["PYTHONPATH"].split(os.pathsep) if "PYTHONPATH" in os.environ else []) + ["#{HOMEBREW_PREFIX}/lib/python2.7/site-packages"] + sys.path
-    EOS
+    PYTHON
   end
 
   public
@@ -1893,6 +1895,66 @@ class Formula
       opoo "Skipping #{full_name}: most recent version #{pkg_version} not installed"
     end
     eligible_for_cleanup
+  end
+
+  # Create a temporary directory then yield. When the block returns,
+  # recursively delete the temporary directory. Passing opts[:retain]
+  # or calling `do |staging| ... staging.retain!` in the block will skip
+  # the deletion and retain the temporary directory's contents.
+  def mktemp(prefix = name, opts = {})
+    Mktemp.new(prefix, opts).run do |staging|
+      yield staging
+    end
+  end
+
+  # A version of `FileUtils.mkdir` that also changes to that folder in
+  # a block.
+  def mkdir(name)
+    result = FileUtils.mkdir_p(name)
+    return result unless block_given?
+    FileUtils.chdir name do
+      yield
+    end
+  end
+
+  # Run `scons` using a Homebrew-installed version rather than whatever is
+  # in the `PATH`.
+  def scons(*args)
+    system Formulary.factory("scons").opt_bin/"scons", *args
+  end
+
+  # Run `make` 3.81 or newer.
+  # Uses the system make on Leopard and newer, and the
+  # path to the actually-installed make on Tiger or older.
+  def make(*args)
+    if Utils.popen_read("/usr/bin/make", "--version")
+            .match(/Make (\d\.\d+)/)[1] > "3.80"
+      make_path = "/usr/bin/make"
+    else
+      make = Formula["make"].opt_bin/"make"
+      make_path = if make.exist?
+        make.to_s
+      else
+        (Formula["make"].opt_bin/"gmake").to_s
+      end
+    end
+
+    if superenv?
+      make_name = File.basename(make_path)
+      with_env(HOMEBREW_MAKE: make_name) do
+        system "make", *args
+      end
+    else
+      system make_path, *args
+    end
+  end
+
+  # Run `xcodebuild` without Homebrew's compiler environment variables set.
+  def xcodebuild(*args)
+    removed = ENV.remove_cc_etc
+    system "xcodebuild", *args
+  ensure
+    ENV.update(removed)
   end
 
   private

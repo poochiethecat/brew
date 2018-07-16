@@ -36,6 +36,7 @@ module Hbc
       check_untrusted_pkg
       check_hosting_with_appcast
       check_latest_with_appcast
+      check_latest_with_auto_updates
       check_stanza_requires_uninstall
       self
     rescue StandardError => e
@@ -199,23 +200,29 @@ module Hbc
       add_warning "Casks with an appcast should not use version :latest"
     end
 
+    def check_latest_with_auto_updates
+      return unless cask.version.latest?
+      return unless cask.auto_updates
+
+      add_warning "Casks with `version :latest` should not use `auto_updates`"
+    end
+
     def check_hosting_with_appcast
       return if cask.appcast
-      check_github_releases_appcast
-      check_sourceforge_appcast
-    end
 
-    def check_github_releases_appcast
-      return unless cask.url.to_s =~ %r{github.com/([^/]+)/([^/]+)/releases/download/(\S+)}
+      add_appcast = "please add an appcast. See https://github.com/Homebrew/homebrew-cask/blob/master/doc/cask_language_reference/stanzas/appcast.md"
 
-      add_warning "Download uses GitHub releases, please add an appcast. See https://github.com/Homebrew/homebrew-cask/blob/master/doc/cask_language_reference/stanzas/appcast.md"
-    end
-
-    def check_sourceforge_appcast
-      return if cask.version.latest?
-      return unless cask.url.to_s =~ %r{sourceforge.net/(\S+)}
-
-      add_warning "Download is hosted on SourceForge, please add an appcast. See https://github.com/Homebrew/homebrew-cask/blob/master/doc/cask_language_reference/stanzas/appcast.md"
+      case cask.url.to_s
+      when %r{github.com/([^/]+)/([^/]+)/releases/download/(\S+)}
+        add_warning "Download uses GitHub releases, #{add_appcast}"
+      when %r{sourceforge.net/(\S+)}
+        return if cask.version.latest?
+        add_warning "Download is hosted on SourceForge, #{add_appcast}"
+      when %r{dl.devmate.com/(\S+)}
+        add_warning "Download is hosted on DevMate, #{add_appcast}"
+      when %r{rink.hockeyapp.net/(\S+)}
+        add_warning "Download is hosted on HockeyApp, #{add_appcast}"
+      end
     end
 
     def check_url
