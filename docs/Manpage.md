@@ -687,7 +687,7 @@ With `--verbose` or `-v`, many commands print extra debugging information. Note 
     `audit` exits with a non-zero status if any errors are found. This is useful,
     for instance, for implementing pre-commit hooks.
 
-  * `bottle` [`--verbose`] [`--no-rebuild`|`--keep-old`] [`--skip-relocation`] [`--or-later`] [`--root-url=``URL`] [`--force-core-tap`] `formulae`:
+  * `bottle` [`--verbose`] [`--no-rebuild`|`--keep-old`] [`--skip-relocation`] [`--or-later`] [`--root-url=``URL`] [`--force-core-tap`] [`--json`] `formulae`:
     Generate a bottle (binary package) from a formula installed with
     `--build-bottle`.
 
@@ -709,9 +709,12 @@ With `--verbose` or `-v`, many commands print extra debugging information. Note 
     If `--force-core-tap` is passed, build a bottle even if `formula` is not
     in homebrew/core or any installed taps.
 
-  * `bottle` `--merge` [`--keep-old`] [`--write` [`--no-commit`]] `formulae`:
-    Generate a bottle from a formula and print the new DSL merged into the
-    existing formula.
+    If `--json` is passed, write bottle information to a JSON file, which can
+    be used as the argument for `--merge`.
+
+  * `bottle` `--merge` [`--keep-old`] [`--write` [`--no-commit`]] `bottle_json_files`:
+    Generate a bottle from a `--json` output file and print the new DSL merged
+    into the existing formula.
 
     If `--write` is passed, write the changes to the formula file. A new
     commit will then be generated unless `--no-commit` is passed.
@@ -796,8 +799,8 @@ With `--verbose` or `-v`, many commands print extra debugging information. Note 
     If `--pry` is passed or HOMEBREW_PRY is set, pry will be
     used instead of irb.
 
-  * `linkage` [`--test`] [`--reverse`] `formula`:
-    Checks the library links of an installed formula.
+  * `linkage` [`--test`] [`--reverse`] [`formulae`]:
+    Checks the library links of installed formulae.
 
     Only works on installed formulae. An error is raised if it is run on
     uninstalled formulae.
@@ -807,6 +810,8 @@ With `--verbose` or `-v`, many commands print extra debugging information. Note 
 
     If `--reverse` is passed, print the dylib followed by the binaries
     which link to it for each library the keg references.
+
+    If `formulae` are given, check linkage for only the specified brews.
 
   * `man` [`--fail-if-changed`]:
     Generate Homebrew's manpages.
@@ -1113,7 +1118,7 @@ Note that environment variables must have a value set to be detected. For exampl
     When using the `S3` download strategy, Homebrew will look in
     these variables for access credentials (see
     <https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-getting-started.html#cli-environment>
-    to retrieve these access credentials from AWS).  If they are not set,
+    to retrieve these access credentials from AWS). If they are not set,
     the `S3` download strategy will download with a public
     (unsigned) URL.
 
@@ -1301,6 +1306,8 @@ Homebrew Documentation: <https://docs.brew.sh>
 ## AUTHORS
 
 Homebrew's lead maintainer is Mike McQuaid.
+
+Homebrew's project leadership committee is Mike McQuaid, ilovezfs, JCount, Misty De Meo and Markus Reiter.
 
 Homebrew/homebrew-core's lead maintainer is ilovezfs.
 

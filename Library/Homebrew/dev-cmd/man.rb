@@ -68,6 +68,8 @@ module Homebrew
     readme = HOMEBREW_REPOSITORY/"README.md"
     variables[:lead_maintainer] = readme.read[/(Homebrew's lead maintainer .*\.)/, 1]
                                         .gsub(/\[([^\]]+)\]\([^)]+\)/, '\1')
+    variables[:leadership] = readme.read[/(Homebrew's project leadership committee .*\.)/, 1]
+                                   .gsub(/\[([^\]]+)\]\([^)]+\)/, '\1')
     variables[:core_maintainer] = readme.read[%r{(Homebrew/homebrew-core's lead maintainer .*\.)}, 1]
                                         .gsub(/\[([^\]]+)\]\([^)]+\)/, '\1')
     variables[:brew_maintainers] = readme.read[%r{(Homebrew/brew's other current maintainers .*\.)}, 1]
@@ -117,6 +119,7 @@ module Homebrew
       ronn.write markup
       ronn.close_write
       ronn_output = ronn.read
+      odie "Got no output from ronn!" unless ronn_output
       ronn_output.gsub!(%r{</var>`(?=[.!?,;:]?\s)}, "").gsub!(%r{</?var>}, "`") if format_flag == "--markdown"
       target.atomic_write ronn_output
     end

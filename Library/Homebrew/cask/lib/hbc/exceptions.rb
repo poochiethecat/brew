@@ -36,6 +36,12 @@ module Hbc
     end
   end
 
+  class CaskUnreadableError < CaskUnavailableError
+    def to_s
+      "Cask '#{token}' is unreadable" << (reason.empty? ? "." : ": #{reason}")
+    end
+  end
+
   class CaskAlreadyCreatedError < AbstractCaskErrorWithToken
     def to_s
       %Q(Cask '#{token}' already exists. Run #{Formatter.identifier("brew cask edit #{token}")} to edit it.)
@@ -50,31 +56,6 @@ module Hbc
         To re-install #{token}, run:
           #{Formatter.identifier("brew cask reinstall #{token}")}
       EOS
-    end
-  end
-
-  class CaskCommandFailedError < CaskError
-    def initialize(cmd, stdout, stderr, status)
-      @cmd = cmd
-      @stdout = stdout
-      @stderr = stderr
-      @status = status
-    end
-
-    def to_s
-      s = "Command failed to execute!\n"
-      s.concat("\n")
-      s.concat("==> Failed command:\n")
-      s.concat(@cmd.join(" ")).concat("\n")
-      s.concat("\n")
-      s.concat("==> Standard Output of failed command:\n")
-      s.concat(@stdout).concat("\n")
-      s.concat("\n")
-      s.concat("==> Standard Error of failed command:\n")
-      s.concat(@stderr).concat("\n")
-      s.concat("\n")
-      s.concat("==> Exit status of failed command:\n")
-      s.concat(@status.inspect).concat("\n")
     end
   end
 
