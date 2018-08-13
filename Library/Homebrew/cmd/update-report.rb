@@ -62,10 +62,12 @@ module Homebrew
       updated = true
     end
 
-    initial_version = Version.new(system_command!("git",
-                                                  args: ["describe", "--tags", "--abbrev=0", initial_revision],
-                                                  chdir: HOMEBREW_REPOSITORY,
-                                                  print_stderr: false).stdout)
+    out, _, status = system_command("git",
+                                    args: ["describe", "--tags", "--abbrev=0", initial_revision],
+                                    chdir: HOMEBREW_REPOSITORY,
+                                    print_stderr: false)
+
+    initial_version = Version.new(out) if status.success?
 
     updated_taps = []
     Tap.each do |tap|
@@ -147,10 +149,6 @@ module Homebrew
     return unless legacy_cache.writable_real?
     FileUtils.touch migration_attempted_file
 
-    # Cleanup to avoid copying files unnecessarily
-    ohai "Cleaning up #{legacy_cache}..."
-    Cleanup.cleanup_cache legacy_cache
-
     # This directory could have been compromised if it's world-writable/
     # a symlink/owned by another user so don't copy files in those cases.
     world_writable = legacy_cache.stat.mode & 0777 == 0777
@@ -190,27 +188,47 @@ module Homebrew
   end
 
   def migrate_cache_entries_to_double_dashes(initial_version)
-    return if initial_version > "1.7.1"
+    return if initial_version && initial_version > "1.7.1"
 
-    HOMEBREW_CACHE.children.each do |child|
-      next unless child.file?
+    return if ENV.key?("HOMEBREW_DISABLE_LOAD_FORMULA")
 
-      next unless /^(?<prefix>[^\.]+[^\-])\-(?<suffix>[^\-].*)/ =~ child.basename.to_s
-      target = HOMEBREW_CACHE/"#{prefix}--#{suffix}"
+    ohai "Migrating cache entries..."
 
-      next if suffix.include?("--") && !suffix.start_with?("patch")
+    Formula.each do |formula|
+      specs = [*formula.stable, *formula.devel, *formula.head]
 
-      if target.exist?
-        begin
-          FileUtils.rm_rf child
-        rescue Errno::EACCES
-          opoo "Could not remove #{child}, please do so manually."
-        end
-      else
-        begin
-          FileUtils.mv child, target
-        rescue Errno::EACCES
-          opoo "Could not move #{child} to #{target}, please do so manually."
+      resources = [*formula.bottle&.resource] + specs.flat_map do |spec|
+        [
+          spec,
+          *spec.resources.values,
+          *spec.patches.select(&:external?).map(&:resource),
+        ]
+      end
+
+      resources.each do |resource|
+        downloader = resource.downloader
+
+        name = resource.download_name
+        version = resource.version
+
+        new_location = downloader.cached_location
+        extname = new_location.extname
+        old_location = downloader.cached_location.dirname/"#{name}-#{version}#{extname}"
+
+        next unless old_location.file?
+
+        if new_location.exist?
+          begin
+            FileUtils.rm_rf old_location
+          rescue Errno::EACCES
+            opoo "Could not remove #{old_location}, please do so manually."
+          end
+        else
+          begin
+            FileUtils.mv old_location, new_location
+          rescue Errno::EACCES
+            opoo "Could not move #{old_location} to #{new_location}, please do so manually."
+          end
         end
       end
     end
