@@ -25,9 +25,7 @@ From the manpage:
 
 The current schema version is `v1`. Note that fields may be added to the schema as needed without incrementing the schema. Any significant breaking changes will cause a change to the schema version.
 
-The schema itself is not currently documented outside of the code that generates it: [Formula#to_hash](https://github.com/Homebrew/brew/blob/master/Library/Homebrew/formula.rb)
-
-(**TODO**: add a manpage for the schema)
+The schema itself is not currently documented outside of the code in [`formula.rb`](https://github.com/Homebrew/brew/blob/e9b9ea49a16b7879731d01ff2842460d33257a06/Library/Homebrew/formula.rb#L1594-L1680) that generates it.
 
 ## Examples
 
@@ -70,6 +68,10 @@ To find the names of normal (not keg-only) formulae that are installed, but not 
 ```sh
 brew info --json=v1 --installed | jq "map(select(.keg_only == false and .linked_keg == null) | .name)"
 ```
+
+## formulae.brew.sh
+
+[formulae.brew.sh](https://formulae.brew.sh) has a [documented JSON API](https://formulae.brew.sh/docs/api/) which provides access to the `brew info --json=v1` output without needing access to Homebrew.
 
 ## Concluding remarks
 

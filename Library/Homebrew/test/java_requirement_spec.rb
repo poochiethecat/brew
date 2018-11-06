@@ -14,7 +14,7 @@ describe JavaRequirement do
   describe "#inspect" do
     subject { described_class.new(%w[1.7+]) }
 
-    its(:inspect) { is_expected.to eq('#<JavaRequirement: "java" [] version="1.7+">') }
+    its(:inspect) { is_expected.to eq('#<JavaRequirement: [] version="1.7+">') }
   end
 
   describe "#display_s" do
@@ -55,7 +55,7 @@ describe JavaRequirement do
       def setup_java_with_version(version)
         IO.write java, <<~SH
           #!/bin/sh
-          echo 'java version "#{version}"'
+          echo 'java version "#{version}"' 1>&2
         SH
         FileUtils.chmod "+x", java
       end

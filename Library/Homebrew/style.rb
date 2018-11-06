@@ -18,6 +18,7 @@ module Homebrew
       fix = options[:fix]
 
       Homebrew.install_gem_setup_path! "rubocop", HOMEBREW_RUBOCOP_VERSION
+      Homebrew.install_gem! "rubocop-rspec"
       require "rubocop"
       require "rubocops"
 
@@ -32,11 +33,6 @@ module Homebrew
 
       if ARGV.verbose?
         args += ["--extra-details", "--display-cop-names"]
-      end
-
-      if ARGV.include?("--rspec")
-        Homebrew.install_gem! "rubocop-rspec"
-        args += %w[--require rubocop-rspec]
       end
 
       if options[:except_cops]
@@ -64,17 +60,10 @@ module Homebrew
       has_non_formula = Array(files).any? do |file|
         File.expand_path(file).start_with? HOMEBREW_LIBRARY_PATH
       end
-      config_file = if files.nil? || has_non_formula
-        if ARGV.include?("--rspec")
-          HOMEBREW_LIBRARY_PATH/".rubocop-rspec.yml"
-        else
-          HOMEBREW_LIBRARY_PATH/".rubocop.yml"
-        end
-      else
-        HOMEBREW_LIBRARY/".rubocop_audit.yml"
-      end
 
-      args << "--config" << config_file
+      unless files.nil? || has_non_formula
+        args << "--config" << HOMEBREW_LIBRARY/".rubocop_audit.yml"
+      end
 
       if files.nil?
         args << HOMEBREW_LIBRARY_PATH
@@ -84,15 +73,19 @@ module Homebrew
 
       cache_env = { "XDG_CACHE_HOME" => "#{HOMEBREW_CACHE}/style" }
 
+      rubocop_success = false
+
       case output_type
       when :print
         args << "--debug" if ARGV.debug?
         args << "--display-cop-names" if ARGV.include? "--display-cop-names"
         args << "--format" << "simple" if files
         system(cache_env, "rubocop", "_#{HOMEBREW_RUBOCOP_VERSION}_", *args)
-        !$CHILD_STATUS.success?
+        rubocop_success = $CHILD_STATUS.success?
       when :json
-        json, err, status = Open3.capture3(cache_env, "rubocop", "_#{HOMEBREW_RUBOCOP_VERSION}_", "--format", "json", *args)
+        json, err, status =
+          Open3.capture3(cache_env, "rubocop", "_#{HOMEBREW_RUBOCOP_VERSION}_",
+                         "--format", "json", *args)
         # exit status of 1 just means violations were found; other numbers mean
         # execution errors.
         # exitstatus can also be nil if RuboCop process crashes, e.g. due to
@@ -101,10 +94,36 @@ module Homebrew
         if !(0..1).cover?(status.exitstatus) || json.to_s.length < 2
           raise "Error running `rubocop --format json #{args.join " "}`\n#{err}"
         end
-        RubocopResults.new(JSON.parse(json))
+
+        return RubocopResults.new(JSON.parse(json))
       else
         raise "Invalid output_type for check_style_impl: #{output_type}"
       end
+
+      return !rubocop_success if !files.nil? && !has_non_formula
+
+      shellcheck   = which("shellcheck")
+      shellcheck ||= which("shellcheck", ENV["HOMEBREW_PATH"])
+      shellcheck ||= begin
+        ohai "Installing `shellcheck` for shell style checks..."
+        system HOMEBREW_BREW_FILE, "install", "shellcheck"
+        which("shellcheck") || which("shellcheck", ENV["HOMEBREW_PATH"])
+      end
+      unless shellcheck
+        opoo "Could not find or install `shellcheck`! Not checking shell style."
+        return !rubocop_success
+      end
+
+      shell_files = [
+        HOMEBREW_BREW_FILE,
+        *Pathname.glob("#{HOMEBREW_LIBRARY}/Homebrew/*.sh"),
+        *Pathname.glob("#{HOMEBREW_LIBRARY}/Homebrew/cmd/*.sh"),
+        *Pathname.glob("#{HOMEBREW_LIBRARY}/Homebrew/utils/*.sh"),
+      ].select(&:exist?)
+      # TODO: check, fix completions here too.
+      # TODO: consider using ShellCheck JSON output
+      shellcheck_success = system shellcheck, "--shell=bash", *shell_files
+      !rubocop_success || !shellcheck_success
     end
 
     class RubocopResults
@@ -113,13 +132,14 @@ module Homebrew
         @file_offenses = {}
         json["files"].each do |f|
           next if f["offenses"].empty?
+
           file = File.realpath(f["path"])
           @file_offenses[file] = f["offenses"].map { |x| RubocopOffense.new(x) }
         end
       end
 
       def file_offenses(path)
-        @file_offenses[path.to_s]
+        @file_offenses.fetch(path.to_s, [])
       end
     end
 
@@ -138,11 +158,20 @@ module Homebrew
         @severity[0].upcase
       end
 
+      def corrected?
+        @corrected
+      end
+
+      def correction_status
+        "[Corrected] " if corrected?
+      end
+
       def to_s(options = {})
         if options[:display_cop_name]
-          "#{severity_code}: #{location.to_short_s}: #{cop_name}: #{message}"
+          "#{severity_code}: #{location.to_short_s}: #{cop_name}: " \
+          "#{Tty.green}#{correction_status}#{Tty.reset}#{message}"
         else
-          "#{severity_code}: #{location.to_short_s}: #{message}"
+          "#{severity_code}: #{location.to_short_s}: #{Tty.green}#{correction_status}#{Tty.reset}#{message}"
         end
       end
     end

@@ -144,6 +144,7 @@ class ExternalPatch
             the "apply" method was used one or more times in the patch-do block.
           EOS
         end
+
         patch_files << children.first.basename
       end
       dir.cd do
@@ -161,7 +162,7 @@ class ExternalPatch
   end
 end
 
-# Legacy patches have no checksum and are not cached
+# Legacy patches have no checksum and are not cached.
 class LegacyPatch < ExternalPatch
   def initialize(strip, url)
     super(strip)

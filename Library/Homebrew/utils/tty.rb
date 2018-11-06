@@ -7,8 +7,8 @@ module Tty
 
   def width
     @width ||= begin
-      width = `/bin/stty size 2>/dev/null`.split[1]
-      width = `/usr/bin/tput cols 2>/dev/null`.split[0] if width.to_i.zero?
+      _, width = `/bin/stty size 2>/dev/null`.split
+      width, = `/usr/bin/tput cols 2>/dev/null`.split if width.to_i.zero?
       width ||= 80
       width.to_i
     end
@@ -19,22 +19,22 @@ module Tty
   end
 
   COLOR_CODES = {
-    red: 31,
-    green: 32,
-    yellow: 33,
-    blue: 34,
+    red:     31,
+    green:   32,
+    yellow:  33,
+    blue:    34,
     magenta: 35,
-    cyan: 36,
+    cyan:    36,
     default: 39,
   }.freeze
 
   STYLE_CODES = {
-    reset: 0,
-    bold: 1,
-    italic: 3,
-    underline: 4,
+    reset:         0,
+    bold:          1,
+    italic:        3,
+    underline:     4,
     strikethrough: 9,
-    no_underline: 24,
+    no_underline:  24,
   }.freeze
 
   CODES = COLOR_CODES.merge(STYLE_CODES).freeze
@@ -47,6 +47,7 @@ module Tty
 
   def current_escape_sequence
     return "" if @escape_sequence.nil?
+
     "\033[#{@escape_sequence.join(";")}m"
   end
 
@@ -64,6 +65,7 @@ module Tty
     if !ENV["HOMEBREW_COLOR"] && (ENV["HOMEBREW_NO_COLOR"] || !$stdout.tty?)
       return ""
     end
+
     current_escape_sequence
   ensure
     reset_escape_sequence!

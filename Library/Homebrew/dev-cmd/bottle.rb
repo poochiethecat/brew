@@ -1,10 +1,10 @@
 #:  * `bottle` [`--verbose`] [`--no-rebuild`|`--keep-old`] [`--skip-relocation`] [`--or-later`] [`--root-url=`<URL>] [`--force-core-tap`] [`--json`] <formulae>:
-#:    Generate a bottle (binary package) from a formula installed with
+#:    Generate a bottle (binary package) from a formula that was installed with
 #:    `--build-bottle`.
 #:
 #:    If the formula specifies a rebuild version, it will be incremented in the
-#:    generated DSL. Passing `--keep-old` will attempt to keep it at its
-#:    original value, while `--no-rebuild` will remove it.
+#:    generated DSL. Passing `--keep-old` will attempt to keep it at its original
+#:    value, while `--no-rebuild` will remove it.
 #:
 #:    If `--verbose` (or `-v`) is passed, print the bottling commands and any warnings
 #:    encountered.
@@ -15,7 +15,7 @@
 #:    If `--root-url` is passed, use the specified <URL> as the root of the
 #:    bottle's URL instead of Homebrew's default.
 #:
-#:    If `--or-later` is passed, append _or_later to the bottle tag.
+#:    If `--or-later` is passed, append `_or_later` to the bottle tag.
 #:
 #:    If `--force-core-tap` is passed, build a bottle even if <formula> is not
 #:    in homebrew/core or any installed taps.
@@ -41,15 +41,15 @@ require "erb"
 
 BOTTLE_ERB = <<-EOS.freeze
   bottle do
-    <% if !root_url.start_with?(HOMEBREW_BOTTLE_DEFAULT_DOMAIN) %>
+    <% if !["#{HOMEBREW_BOTTLE_DEFAULT_DOMAIN}/bottles", "https://homebrew.bintray.com/bottles"].include?(root_url) %>
     root_url "<%= root_url %>"
     <% end %>
-    <% if prefix != BottleSpecification::DEFAULT_PREFIX %>
+    <% if ![Homebrew::DEFAULT_PREFIX, "/usr/local"].include?(prefix) %>
     prefix "<%= prefix %>"
     <% end %>
     <% if cellar.is_a? Symbol %>
     cellar :<%= cellar %>
-    <% elsif cellar != BottleSpecification::DEFAULT_CELLAR %>
+    <% elsif ![Homebrew::DEFAULT_CELLAR, "/usr/local/Cellar"].include?(cellar) %>
     cellar "<%= cellar %>"
     <% end %>
     <% if rebuild.positive? %>
@@ -69,23 +69,56 @@ MAXIMUM_STRING_MATCHES = 100
 module Homebrew
   module_function
 
-  def bottle
-    Homebrew::CLI::Parser.parse do
-      switch "--merge"
-      switch "--skip-relocation"
-      switch "--force-core-tap"
-      switch "--no-rebuild"
-      switch "--keep-old"
-      switch "--write"
-      switch "--no-commit"
-      switch "--json"
-      switch "--or-later"
+  def bottle_args
+    Homebrew::CLI::Parser.new do
+      usage_banner <<~EOS
+        `bottle` [<options>] <formulae>
+
+        Generate a bottle (binary package) from a formula that was installed with
+        `--build-bottle`.
+        If the formula specifies a rebuild version, it will be incremented in the
+        generated DSL. Passing `--keep-old` will attempt to keep it at its original
+        value, while `--no-rebuild` will remove it.
+      EOS
+      switch "--skip-relocation",
+        description: "Do not check if the bottle can be marked as relocatable."
+      switch "--or-later",
+        description: "Append `_or_later` to the bottle tag."
+      switch "--force-core-tap",
+        description: "Build a bottle even if <formula> is not in homebrew/core or any installed taps."
+      switch "--no-rebuild",
+        description: "If the formula specifies a rebuild version, remove it from the generated DSL."
+      switch "--keep-old",
+        description: "If the formula specifies a rebuild version, attempt to preserve its value in the "\
+                     "generated DSL."
+      switch "--json",
+        description: "Write bottle information to a JSON file, which can be used as the argument for "\
+                     "`--merge`."
+      switch "--merge",
+        description: "Generate an updated bottle block for a formula and optionally merge it into the "\
+                     "formula file. Instead of a formula name, requires a JSON file generated with "\
+                     "`brew bottle --json` <formula>."
+      switch "--write",
+        depends_on:  "--merge",
+        description: "Write the changes to the formula file. A new commit will be generated unless "\
+                     "`--no-commit` is passed."
+      switch "--no-commit",
+        depends_on:  "--write",
+        description: "When passed with `--write`, a new commit will not generated after writing changes "\
+                     "to the formula file."
+      flag   "--root-url=",
+        description: "Use the specified <URL> as the root of the bottle's URL instead of Homebrew's default."
       switch :verbose
       switch :debug
-      flag   "--root-url"
+      conflicts "--no-rebuild", "--keep-old"
     end
+  end
+
+  def bottle
+    bottle_args.parse
 
     return merge if args.merge?
+
     ensure_relocation_formulae_installed!
     ARGV.resolved_formulae.each do |f|
       bottle_formula f
@@ -95,6 +128,7 @@ module Homebrew
   def ensure_relocation_formulae_installed!
     Keg.relocation_formulae.each do |f|
       next if Formula[f].installed?
+
       ohai "Installing #{f}..."
       safe_system HOMEBREW_BREW_FILE, "install", f
     end
@@ -140,6 +174,7 @@ module Homebrew
           str = io.readline.chomp
           next if ignores.any? { |i| i =~ str }
           next unless str.include? string
+
           offset, match = str.split(" ", 2)
           next if linked_libraries.include? match # Don't bother reporting a string if it was found by otool
 
@@ -149,6 +184,7 @@ module Homebrew
       end
 
       next unless args.verbose? && !text_matches.empty?
+
       print_filename.call(string, file)
       text_matches.first(MAXIMUM_STRING_MATCHES).each do |match, offset|
         puts " #{Tty.bold}-->#{Tty.reset} match '#{match}' at offset #{Tty.bold}0x#{offset}#{Tty.reset}"
@@ -166,6 +202,7 @@ module Homebrew
     absolute_symlinks_start_with_string = []
     keg.find do |pn|
       next unless pn.symlink? && (link = pn.readlink).absolute?
+
       absolute_symlinks_start_with_string << pn if link.to_s.start_with?(string)
     end
 
@@ -193,7 +230,7 @@ module Homebrew
 
     unless tap = f.tap
       unless args.force_core_tap?
-        return ofail "Formula not from core or any taps: #{f.full_name}"
+        return ofail "Formula not from core or any installed taps: #{f.full_name}"
       end
 
       tap = CoreTap.instance
@@ -285,7 +322,7 @@ module Homebrew
           ohai "Detecting if #{filename} is relocatable..."
         end
 
-        if prefix == "/usr/local"
+        if Homebrew.default_prefix?(prefix)
           prefix_check = File.join(prefix, "opt")
         else
           prefix_check = prefix
@@ -376,28 +413,30 @@ module Homebrew
     puts output
 
     return unless args.json?
+
     tag = Utils::Bottles.tag.to_s
     tag += "_or_later" if args.or_later?
     json = {
       f.full_name => {
         "formula" => {
           "pkg_version" => f.pkg_version.to_s,
-          "path" => f.path.to_s.strip_prefix("#{HOMEBREW_REPOSITORY}/"),
+          "path"        => f.path.to_s.delete_prefix("#{HOMEBREW_REPOSITORY}/"),
         },
-        "bottle" => {
+        "bottle"  => {
           "root_url" => bottle.root_url,
-          "prefix" => bottle.prefix,
-          "cellar" => bottle.cellar.to_s,
-          "rebuild" => bottle.rebuild,
-          "tags" => {
+          "prefix"   => bottle.prefix,
+          "cellar"   => bottle.cellar.to_s,
+          "rebuild"  => bottle.rebuild,
+          "tags"     => {
             tag => {
-              "filename" => filename.bintray,
-              "sha256" => sha256,
+              "filename"       => filename.bintray,
+              "local_filename" => filename.to_s,
+              "sha256"         => sha256,
             },
           },
         },
         "bintray" => {
-          "package" => Utils::Bottles::Bintray.package(f.name),
+          "package"    => Utils::Bottles::Bintray.package(f.name),
           "repository" => Utils::Bottles::Bintray.repository(tap),
         },
       },
@@ -411,7 +450,7 @@ module Homebrew
     write = args.write?
 
     bottles_hash = ARGV.named.reduce({}) do |hash, json_file|
-      deep_merge_hashes hash, JSON.parse(IO.read(json_file))
+      hash.deep_merge(JSON.parse(IO.read(json_file)))
     end
 
     bottles_hash.each do |formula_name, bottle_hash|
@@ -443,15 +482,17 @@ module Homebrew
               bottle_block_contents.lines.each do |line|
                 line = line.strip
                 next if line.empty?
+
                 key, old_value_original, _, tag = line.split " ", 4
                 valid_key = %w[root_url prefix cellar rebuild sha1 sha256].include? key
                 next unless valid_key
 
-                old_value = old_value_original.to_s.delete ":'\""
+                old_value = old_value_original.to_s.delete "'\""
+                old_value = old_value.to_s.delete ":" if key != "root_url"
                 tag = tag.to_s.delete ":"
 
                 unless tag.empty?
-                  if !bottle_hash["bottle"]["tags"][tag].to_s.empty?
+                  if bottle_hash["bottle"]["tags"][tag].present?
                     mismatches << "#{key} => #{tag}"
                   else
                     bottle.send(key, old_value => tag.to_sym)
@@ -463,6 +504,7 @@ module Homebrew
                 value = value_original.to_s
                 next if key == "cellar" && old_value == "any" && value == "any_skip_relocation"
                 next unless old_value.empty? || value != old_value
+
                 old_value = old_value_original.inspect
                 value = value_original.inspect
                 mismatches << "#{key}: old: #{old_value}, new: #{value}"

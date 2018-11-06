@@ -1,9 +1,9 @@
-require_relative "./extend/formula_cop"
+require "rubocops/extend/formula_cop"
 
 module RuboCop
   module Cop
     module FormulaAudit
-      # This cop audits `homepage` url in Formulae
+      # This cop audits the `homepage` URL in Formulae.
       class Homepage < FormulaCop
         def audit_formula(_node, _class_node, _parent_class_node, body_node)
           homepage_node = find_node_method_by_name(body_node, :homepage)
@@ -58,7 +58,9 @@ module RuboCop
 
           # There's an auto-redirect here, but this mistake is incredibly common too.
           # Only applies to the homepage and subdomains for now, not the FTP URLs.
-          when %r{^http://((?:build|cloud|developer|download|extensions|git|glade|help|library|live|nagios|news|people|projects|rt|static|wiki|www)\.)?gnome\.org}
+          when %r{^http://((?:build|cloud|developer|download|extensions|git|
+                              glade|help|library|live|nagios|news|people|
+                              projects|rt|static|wiki|www)\.)?gnome\.org}x
             problem "Please use https:// for #{homepage}"
 
           # Compact the above into this list as we're able to remove detailed notations, etc over time.

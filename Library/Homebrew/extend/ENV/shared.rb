@@ -6,7 +6,7 @@ require "development_tools"
 # {Stdenv} (depending on the build mode).
 # @see Superenv
 # @see Stdenv
-# @see http://www.rubydoc.info/stdlib/Env Ruby's ENV API
+# @see https://www.rubydoc.info/stdlib/Env Ruby's ENV API
 module SharedEnvExtension
   include CompilerConstants
 
@@ -88,13 +88,14 @@ module SharedEnvExtension
 
   # Prepends a directory to `PATH`.
   # Is the formula struggling to find the pkgconfig file? Point it to it.
-  # This is done automatically for `keg_only` formulae.
+  # This is done automatically for keg-only formulae.
   # <pre>ENV.prepend_path "PKG_CONFIG_PATH", "#{Formula["glib"].opt_lib}/pkgconfig"</pre>
   # Prepending a system path such as /usr/bin is a no-op so that requirements
-  # don't accidentally override superenv shims or formulae's `bin` directories
-  # (e.g. <pre>ENV.prepend_path "PATH", which("emacs").dirname</pre>)
+  # don't accidentally override superenv shims or formulae's `bin` directories, e.g.
+  # <pre>ENV.prepend_path "PATH", which("emacs").dirname</pre>
   def prepend_path(key, path)
     return if %w[/usr/bin /bin /usr/sbin /sbin].include? path.to_s
+
     self[key] = PATH.new(self[key]).prepend(path)
   end
 
@@ -106,8 +107,10 @@ module SharedEnvExtension
 
   def remove(keys, value)
     return if value.nil?
+
     Array(keys).each do |key|
       next unless self[key]
+
       self[key] = self[key].sub(value, "")
       delete(key) if self[key].empty?
     end
@@ -191,7 +194,7 @@ module SharedEnvExtension
   end
 
   # Snow Leopard defines an NCURSES value the opposite of most distros.
-  # See: https://bugs.python.org/issue6848
+  # @see https://bugs.python.org/issue6848
   # Currently only used by aalib in core.
   def ncurses_define
     append "CPPFLAGS", "-DNCURSES_OPAQUE=0"
@@ -223,6 +226,7 @@ module SharedEnvExtension
     # building with an alternative Fortran compiler without optimization flags,
     # despite it often being the Homebrew-provided one set up in the first call.
     return if @fortran_setup_done
+
     @fortran_setup_done = true
 
     flags = []
@@ -294,6 +298,7 @@ module SharedEnvExtension
     end
 
     return if gcc_formula.opt_prefix.exist?
+
     raise <<~EOS
       The requested Homebrew GCC was not installed. You must:
         brew install #{gcc_formula.full_name}
@@ -313,7 +318,12 @@ module SharedEnvExtension
   # @private
   def compiler_with_cxx11_support?(cc)
     return if compiler_any_clang?(cc)
-    version = cc[/^gcc-(\d+(?:\.\d+)?)$/, 1]
+
+    version = if cc == :gcc
+      non_apple_gcc_version "gcc"
+    else
+      cc[/^gcc-(\d+(?:\.\d+)?)$/, 1]
+    end
     version && Version.create(version) >= Version.create("4.8")
   end
 
@@ -344,6 +354,7 @@ module SharedEnvExtension
 
   def check_for_compiler_universal_support
     return unless homebrew_cc =~ GNU_GCC_REGEXP
+
     raise "Non-Apple GCC can't build universal binaries"
   end
 end

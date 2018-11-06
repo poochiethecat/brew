@@ -55,7 +55,7 @@ class Version
   NULL_TOKEN = NullToken.new
 
   class StringToken < Token
-    PATTERN = /[a-z]+[0-9]*/i
+    PATTERN = /[a-z]+[0-9]*/i.freeze
 
     def initialize(value)
       @value = value.to_s
@@ -72,7 +72,7 @@ class Version
   end
 
   class NumericToken < Token
-    PATTERN = /[0-9]+/i
+    PATTERN = /[0-9]+/i.freeze
 
     def initialize(value)
       @value = value.to_i
@@ -101,7 +101,7 @@ class Version
   end
 
   class AlphaToken < CompositeToken
-    PATTERN = /alpha[0-9]*|a[0-9]+/i
+    PATTERN = /alpha[0-9]*|a[0-9]+/i.freeze
 
     def <=>(other)
       case other
@@ -116,7 +116,7 @@ class Version
   end
 
   class BetaToken < CompositeToken
-    PATTERN = /beta[0-9]*|b[0-9]+/i
+    PATTERN = /beta[0-9]*|b[0-9]+/i.freeze
 
     def <=>(other)
       case other
@@ -133,7 +133,7 @@ class Version
   end
 
   class PreToken < CompositeToken
-    PATTERN = /pre[0-9]*/i
+    PATTERN = /pre[0-9]*/i.freeze
 
     def <=>(other)
       case other
@@ -150,7 +150,7 @@ class Version
   end
 
   class RCToken < CompositeToken
-    PATTERN = /rc[0-9]*/i
+    PATTERN = /rc[0-9]*/i.freeze
 
     def <=>(other)
       case other
@@ -167,7 +167,7 @@ class Version
   end
 
   class PatchToken < CompositeToken
-    PATTERN = /p[0-9]*/i
+    PATTERN = /p[0-9]*/i.freeze
 
     def <=>(other)
       case other
@@ -351,9 +351,9 @@ class Version
     # e.g. https://github.com/JustArchi/ArchiSteamFarm/releases/download/2.3.2.0/ASF.zip
     # e.g. https://people.gnome.org/~newren/eg/download/1.7.5.2/eg
     m = %r{/([rvV]_?)?(\d\.\d+(\.\d+){,2})}.match(spec_s)
-    return m.captures[1] unless m.nil?
+    return m.captures.second unless m.nil?
 
-    # e.g. http://www.ijg.org/files/jpegsrc.v8d.tar.gz
+    # e.g. https://www.ijg.org/files/jpegsrc.v8d.tar.gz
     m = /\.v(\d+[a-z]?)/.match(stem)
     return m.captures.first unless m.nil?
 
@@ -368,6 +368,7 @@ class Version
     unless val.respond_to?(:to_str)
       raise TypeError, "Version value must be a string; got a #{val.class} (#{val})"
     end
+
     @version = val.to_str
   end
 
@@ -415,9 +416,11 @@ class Version
         return a <=> b
       elsif a.numeric?
         return 1 if a > NULL_TOKEN
+
         l += 1
       elsif b.numeric?
         return -1 if b > NULL_TOKEN
+
         r += 1
       else
         return a <=> b

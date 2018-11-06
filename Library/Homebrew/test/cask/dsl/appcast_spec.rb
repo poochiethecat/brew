@@ -1,6 +1,6 @@
 require "cmd/cask"
 
-describe Hbc::DSL::Appcast do
+describe Cask::DSL::Appcast do
   subject { described_class.new(url, params) }
 
   let(:url) { "https://example.com" }
@@ -17,14 +17,6 @@ describe Hbc::DSL::Appcast do
     let(:yaml) { [uri, params].to_yaml }
 
     context "with empty parameters" do
-      it "returns an YAML serialized array composed of the URI and parameters" do
-        expect(subject.to_yaml).to eq(yaml)
-      end
-    end
-
-    context "with checkpoint in parameters" do
-      let(:params) { { checkpoint: "abc123" } }
-
       it "returns an YAML serialized array composed of the URI and parameters" do
         expect(subject.to_yaml).to eq(yaml)
       end

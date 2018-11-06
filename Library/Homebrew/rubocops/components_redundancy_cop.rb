@@ -1,13 +1,13 @@
-require_relative "./extend/formula_cop"
+require "rubocops/extend/formula_cop"
 
 module RuboCop
   module Cop
     module FormulaAudit
-      # This cop checks if redundant components are present and other component errors
+      # This cop checks if redundant components are present and other component errors.
       #
       # - `url|checksum|mirror` should be inside `stable` block
       # - `head` and `head do` should not be simultaneously present
-      # - `bottle :unneeded/:disable` and `bottle do` should not be simultaneously present
+      # - `bottle :unneeded`/`:disable` and `bottle do` should not be simultaneously present
       # - `stable do` should not be present without a `head` or `devel` spec
 
       class ComponentsRedundancy < FormulaCop
@@ -32,6 +32,7 @@ module RuboCop
           return if method_called?(body_node, :head) ||
                     find_block(body_node, :head) ||
                     find_block(body_node, :devel)
+
           problem STABLE_MSG if stable_block
         end
       end

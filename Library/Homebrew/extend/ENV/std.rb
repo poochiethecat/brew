@@ -7,7 +7,7 @@ module Stdenv
 
   # @private
   SAFE_CFLAGS_FLAGS = "-w -pipe".freeze
-  DEFAULT_FLAGS = "-march=core2 -msse4".freeze
+  DEFAULT_FLAGS = "-march=native".freeze
 
   # @private
   def setup_build_environment(formula = nil)
@@ -46,6 +46,7 @@ module Stdenv
     send(compiler)
 
     return unless cc =~ GNU_GCC_REGEXP
+
     gcc_formula = gcc_version_formula($&)
     append_path "PATH", gcc_formula.opt_bin.to_s
   end
@@ -107,7 +108,7 @@ module Stdenv
 
   def gcc_4_2
     super
-    set_cpu_cflags
+    set_cpu_cflags "-march=core2 -msse4"
   end
 
   GNU_GCC_VERSIONS.each do |n|
@@ -123,7 +124,7 @@ module Stdenv
     # Clang mistakenly enables AES-NI on plain Nehalem
     map = Hardware::CPU.optimization_flags
     map = map.merge(nehalem: "-march=native -Xclang -target-feature -Xclang -aes")
-    set_cpu_cflags "-march=native", map
+    set_cpu_cflags DEFAULT_FLAGS, map
   end
 
   def minimal_optimization
@@ -159,6 +160,7 @@ module Stdenv
 
     return if compiler_any_clang?
     return unless Hardware.is_32_bit?
+
     # Can't mix "-march" for a 32-bit CPU  with "-arch x86_64"
     replace_in_cflags(/-march=\S*/, "-Xarch_#{Hardware::CPU.arch_32_bit} \\0")
   end

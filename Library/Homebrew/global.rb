@@ -1,25 +1,31 @@
-require "pathname"
 require "English"
+require "json"
+require "json/add/exception"
+require "pathname"
+require "ostruct"
+require "pp"
 
-HOMEBREW_LIBRARY_PATH = Pathname.new(__FILE__).realpath.parent
+require_relative "load_path"
 
-unless $LOAD_PATH.include?("#{HOMEBREW_LIBRARY_PATH}/cask/lib")
-  $LOAD_PATH.push("#{HOMEBREW_LIBRARY_PATH}/cask/lib")
-end
+require "active_support/core_ext/object/blank"
+require "active_support/core_ext/numeric/time"
+require "active_support/core_ext/array/access"
+require "active_support/i18n"
+require "active_support/inflector/inflections"
 
-unless $LOAD_PATH.include?(HOMEBREW_LIBRARY_PATH.to_s)
-  $LOAD_PATH.push(HOMEBREW_LIBRARY_PATH.to_s)
+I18n.backend.available_locales # Initialize locales so they can be overwritten.
+I18n.backend.store_translations :en, support: { array: { last_word_connector: " and " } }
+
+ActiveSupport::Inflector.inflections(:en) do |inflect|
+  inflect.irregular "formula", "formulae"
+  inflect.irregular "is", "are"
+  inflect.irregular "it", "they"
 end
 
 require "config"
-
-require "English"
-require "ostruct"
-require "messages"
-
-require "pp"
+require "os"
 require "extend/ARGV"
-
+require "messages"
 require "system_command"
 
 ARGV.extend(HomebrewArgvExtension)
@@ -38,23 +44,42 @@ RUBY_PATH = Pathname.new(RbConfig.ruby)
 RUBY_BIN = RUBY_PATH.dirname
 
 HOMEBREW_USER_AGENT_CURL = ENV["HOMEBREW_USER_AGENT_CURL"]
-HOMEBREW_USER_AGENT_RUBY = "#{ENV["HOMEBREW_USER_AGENT"]} ruby/#{RUBY_VERSION}-p#{RUBY_PATCHLEVEL}".freeze
-HOMEBREW_USER_AGENT_FAKE_SAFARI = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_3) AppleWebKit/602.4.8 (KHTML, like Gecko) Version/10.0.3 Safari/602.4.8".freeze
+HOMEBREW_USER_AGENT_RUBY =
+  "#{ENV["HOMEBREW_USER_AGENT"]} ruby/#{RUBY_VERSION}-p#{RUBY_PATCHLEVEL}".freeze
+HOMEBREW_USER_AGENT_FAKE_SAFARI =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_3) AppleWebKit/602.4.8 " \
+  "(KHTML, like Gecko) Version/10.0.3 Safari/602.4.8".freeze
 
 # Bintray fallback is here for people auto-updating from a version where
-# HOMEBREW_BOTTLE_DEFAULT_DOMAIN isn't set.
-HOMEBREW_BOTTLE_DEFAULT_DOMAIN = ENV["HOMEBREW_BOTTLE_DEFAULT_DOMAIN"] ||
-                                 "https://homebrew.bintray.com"
+# `HOMEBREW_BOTTLE_DEFAULT_DOMAIN` isn't set.
+HOMEBREW_BOTTLE_DEFAULT_DOMAIN = if ENV["HOMEBREW_BOTTLE_DEFAULT_DOMAIN"]
+  ENV["HOMEBREW_BOTTLE_DEFAULT_DOMAIN"]
+elsif OS.mac? || ENV["HOMEBREW_FORCE_HOMEBREW_ON_LINUX"]
+  "https://homebrew.bintray.com".freeze
+else
+  "https://linuxbrew.bintray.com".freeze
+end
+
 HOMEBREW_BOTTLE_DOMAIN = ENV["HOMEBREW_BOTTLE_DOMAIN"] ||
                          HOMEBREW_BOTTLE_DEFAULT_DOMAIN
 
 require "fileutils"
+require "os"
+require "os/global"
 
 module Homebrew
   extend FileUtils
 
+  DEFAULT_PREFIX ||= "/usr/local".freeze
+  DEFAULT_CELLAR = "#{DEFAULT_PREFIX}/Cellar".freeze
+  DEFAULT_REPOSITORY = "#{DEFAULT_PREFIX}/Homebrew".freeze
+
   class << self
     attr_writer :failed, :raise_deprecation_exceptions, :auditing, :args
+
+    def Homebrew.default_prefix?(prefix = HOMEBREW_PREFIX)
+      prefix.to_s == DEFAULT_PREFIX
+    end
 
     def failed?
       @failed ||= false
@@ -79,8 +104,10 @@ module Homebrew
   end
 end
 
-HOMEBREW_PULL_API_REGEX = %r{https://api\.github\.com/repos/([\w-]+)/([\w-]+)?/pulls/(\d+)}
-HOMEBREW_PULL_OR_COMMIT_URL_REGEX = %r[https://github\.com/([\w-]+)/([\w-]+)?/(?:pull/(\d+)|commit/[0-9a-fA-F]{4,40})]
+HOMEBREW_PULL_API_REGEX =
+  %r{https://api\.github\.com/repos/([\w-]+)/([\w-]+)?/pulls/(\d+)}.freeze
+HOMEBREW_PULL_OR_COMMIT_URL_REGEX =
+  %r[https://github\.com/([\w-]+)/([\w-]+)?/(?:pull/(\d+)|commit/[0-9a-fA-F]{4,40})].freeze
 
 require "forwardable"
 require "PATH"
@@ -95,32 +122,34 @@ ORIGINAL_PATHS = PATH.new(ENV["HOMEBREW_PATH"]).map do |p|
 end.compact.freeze
 
 HOMEBREW_INTERNAL_COMMAND_ALIASES = {
-  "ls" => "list",
-  "homepage" => "home",
-  "-S" => "search",
-  "up" => "update",
-  "ln" => "link",
-  "instal" => "install", # gem does the same
-  "uninstal" => "uninstall",
-  "rm" => "uninstall",
-  "remove" => "uninstall",
-  "configure" => "diy",
-  "abv" => "info",
-  "dr" => "doctor",
-  "--repo" => "--repository",
+  "ls"          => "list",
+  "homepage"    => "home",
+  "-S"          => "search",
+  "up"          => "update",
+  "ln"          => "link",
+  "instal"      => "install", # gem does the same
+  "uninstal"    => "uninstall",
+  "rm"          => "uninstall",
+  "remove"      => "uninstall",
+  "configure"   => "diy",
+  "abv"         => "info",
+  "dr"          => "doctor",
+  "--repo"      => "--repository",
   "environment" => "--env",
-  "--config" => "config",
-  "-v" => "--version",
+  "--config"    => "config",
+  "-v"          => "--version",
 }.freeze
 
 require "set"
 
-require "os"
 require "extend/pathname"
 
 require "extend/module"
 require "extend/predicable"
 require "extend/string"
+require "active_support/core_ext/object/blank"
+require "active_support/core_ext/hash/deep_merge"
+require "active_support/core_ext/file/atomic"
 
 require "constants"
 require "exceptions"

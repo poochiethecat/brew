@@ -31,13 +31,13 @@ describe Tab do
       "stdlib"               => "libcxx",
       "runtime_dependencies" => [],
       "source"               => {
-        "tap" => CoreTap.instance.to_s,
-        "path" => CoreTap.instance.path.to_s,
-        "spec" => "stable",
+        "tap"      => CoreTap.instance.to_s,
+        "path"     => CoreTap.instance.path.to_s,
+        "spec"     => "stable",
         "versions" => {
           "stable" => "0.10",
-          "devel" => "0.14",
-          "head" => "HEAD-1111111",
+          "devel"  => "0.14",
+          "head"   => "HEAD-1111111",
         },
       },
     )
@@ -243,7 +243,10 @@ describe Tab do
     end
 
     it "raises a parse exception message including the Tab filename" do
-      expect { described_class.from_file_content("''", "receipt.json") }.to raise_error(JSON::ParserError, /receipt.json:/)
+      expect { described_class.from_file_content("''", "receipt.json") }.to raise_error(
+        JSON::ParserError,
+        /receipt.json:/,
+      )
     end
   end
 

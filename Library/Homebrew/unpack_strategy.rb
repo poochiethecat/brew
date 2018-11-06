@@ -30,6 +30,7 @@ module UnpackStrategy
   def self.strategies
     @strategies ||= [
       Tar, # needs to be before Bzip2/Gzip/Xz/Lzma
+      Pax,
       Gzip,
       Lzma,
       Xz,
@@ -65,26 +66,26 @@ module UnpackStrategy
 
   def self.from_type(type)
     type = {
-      naked: :uncompressed,
-      nounzip: :uncompressed,
+      naked:     :uncompressed,
+      nounzip:   :uncompressed,
       seven_zip: :p7zip,
     }.fetch(type, type)
 
     begin
-      const_get(type.to_s.split("_").map(&:capitalize).join)
+      const_get(type.to_s.split("_").map(&:capitalize).join.gsub(/\d+[a-z]/, &:upcase))
     rescue NameError
       nil
     end
   end
 
   def self.from_extension(extension)
-    strategies.sort_by { |s| s.extensions.map(&:length).max(0) }
+    strategies.sort_by { |s| s.extensions.map(&:length).max || 0 }
               .reverse
-              .detect { |s| s.extensions.any? { |ext| extension.end_with?(ext) } }
+              .find { |s| s.extensions.any? { |ext| extension.end_with?(ext) } }
   end
 
   def self.from_magic(path)
-    strategies.detect { |s| s.can_extract?(path) }
+    strategies.find { |s| s.can_extract?(path) }
   end
 
   def self.detect(path, extension_only: false, type: nil, ref_type: nil, ref: nil)
@@ -93,7 +94,7 @@ module UnpackStrategy
     if extension_only
       strategy ||= from_extension(path.extname)
       strategy ||= strategies.select { |s| s < Directory || s == Fossil }
-                             .detect { |s| s.can_extract?(path) }
+                             .find { |s| s.can_extract?(path) }
     else
       strategy ||= from_magic(path)
       strategy ||= from_extension(path.extname)
@@ -128,6 +129,8 @@ module UnpackStrategy
       children = tmp_unpack_dir.children
 
       if children.count == 1 && !children.first.directory?
+        FileUtils.chmod "+rw", children.first, verbose: verbose
+
         s = UnpackStrategy.detect(children.first, extension_only: extension_only)
 
         s.extract_nestedly(to: to, verbose: verbose, extension_only: extension_only)
@@ -135,6 +138,8 @@ module UnpackStrategy
       end
 
       Directory.new(tmp_unpack_dir).extract(to: to, verbose: verbose)
+
+      FileUtils.chmod_R "+w", tmp_unpack_dir, force: true, verbose: verbose
     end
   end
 
@@ -165,6 +170,7 @@ require "unpack_strategy/mercurial"
 require "unpack_strategy/microsoft_office_xml"
 require "unpack_strategy/otf"
 require "unpack_strategy/p7zip"
+require "unpack_strategy/pax"
 require "unpack_strategy/pkg"
 require "unpack_strategy/rar"
 require "unpack_strategy/self_extracting_executable"

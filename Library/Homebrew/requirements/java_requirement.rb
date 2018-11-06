@@ -21,12 +21,13 @@ class JavaRequirement < Requirement
   satisfy build_env: false do
     setup_java
     next false unless @java
+
     next true
   end
 
   def initialize(tags = [])
     @version = tags.shift if /(\d+\.)+\d/ =~ tags.first
-    super
+    super(tags)
   end
 
   def message
@@ -38,7 +39,7 @@ class JavaRequirement < Requirement
   end
 
   def inspect
-    "#<#{self.class.name}: #{name.inspect} #{tags.inspect} version=#{@version.inspect}>"
+    "#<#{self.class.name}: #{tags.inspect} version=#{@version.inspect}>"
   end
 
   def display_s
@@ -57,8 +58,8 @@ class JavaRequirement < Requirement
   private
 
   JAVA_CASK_MAP = {
-    "1.8" => "homebrew/cask-versions/java8",
-    "10.0" => "java",
+    "1.8"  => "homebrew/cask-versions/java8",
+    "11.0" => "java",
   }.freeze
 
   def version_without_plus
@@ -76,6 +77,7 @@ class JavaRequirement < Requirement
   def setup_java
     java = preferred_java
     return unless java
+
     @java = java
     @java_home = java.parent.parent
   end
@@ -94,7 +96,7 @@ class JavaRequirement < Requirement
   end
 
   def preferred_java
-    possible_javas.detect do |java|
+    possible_javas.find do |java|
       next false unless java&.executable?
       next true unless @version
       next true if satisfies_version(java)
@@ -103,6 +105,7 @@ class JavaRequirement < Requirement
 
   def env_java_common
     return unless @java_home
+
     java_home = Pathname.new(@java_home)
     ENV["JAVA_HOME"] = java_home
     ENV.prepend_path "PATH", java_home/"bin"
@@ -110,8 +113,10 @@ class JavaRequirement < Requirement
 
   def env_oracle_jdk
     return unless @java_home
+
     java_home = Pathname.new(@java_home)
     return unless (java_home/"include").exist?
+
     ENV.append_to_cflags "-I#{java_home}/include"
     ENV.append_to_cflags "-I#{java_home}/include/#{oracle_java_os}"
     true
@@ -122,8 +127,9 @@ class JavaRequirement < Requirement
   end
 
   def satisfies_version(java)
-    java_version_s = Utils.popen_read(java, "-version", err: :out)[/\d+.\d/]
+    java_version_s = system_command(java, args: ["-version"], print_stderr: false).stderr[/\d+.\d/]
     return false unless java_version_s
+
     java_version = Version.create(java_version_s)
     needed_version = Version.create(version_without_plus)
     if exact_version?

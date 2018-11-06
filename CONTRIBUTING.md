@@ -1,11 +1,11 @@
 # Contributing to Homebrew
-First time contributing to Homebrew? Read our [Code of Conduct](https://github.com/Homebrew/brew/blob/master/CODE_OF_CONDUCT.md#code-of-conduct).
+First time contributing to Homebrew? Read our [Code of Conduct](https://github.com/Homebrew/brew/blob/master/CODE_OF_CONDUCT.md#code-of-conduct) and review [How To Open a Homebrew Pull Request](https://docs.brew.sh/How-To-Open-a-Homebrew-Pull-Request).
 
 ### Report a bug
 
 * Run `brew update` (twice).
 * Run and read `brew doctor`.
-* Read [the Troubleshooting Checklist](https://docs.brew.sh/Troubleshooting).
+* Read the [Troubleshooting checklist](https://docs.brew.sh/Troubleshooting).
 * Open an issue on the formula's repository or on Homebrew/brew if it's not a formula-specific issue.
 
 ### Propose a feature

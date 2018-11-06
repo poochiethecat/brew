@@ -1,5 +1,5 @@
+# @see https://en.wikipedia.org/wiki/Executable_and_Linkable_Format#File_header
 module ELFShim
-  # See: https://en.wikipedia.org/wiki/Executable_and_Linkable_Format#File_header
   MAGIC_NUMBER_OFFSET = 0
   MAGIC_NUMBER_ASCII = "\x7fELF".freeze
 
@@ -94,10 +94,12 @@ module ELFShim
       ldd_paths = ldd_output.map do |line|
         match = line.match(/\t.+ => (.+) \(.+\)|\t(.+) => not found/)
         next unless match
+
         match.captures.compact.first
       end.compact
       @dylibs = ldd_paths.select do |ldd_path|
         next true unless ldd_path.start_with? "/"
+
         needed.include? File.basename(ldd_path)
       end
     end
@@ -133,6 +135,7 @@ module ELFShim
       lines.each do |s|
         filename = s[/\[(.*)\]/, 1]
         next if filename.nil?
+
         if s.include? "(SONAME)"
           soname = filename
         elsif s.include? "(NEEDED)"

@@ -1,4 +1,4 @@
-require_relative "../../rubocops/urls_cop"
+require "rubocops/urls_cop"
 
 describe RuboCop::Cop::FormulaAudit::Urls do
   subject(:cop) { described_class.new }
@@ -19,15 +19,18 @@ describe RuboCop::Cop::FormulaAudit::Urls do
         "col" => 2,
       }, {
         "url" => "http://search.mcpan.org/CPAN/authors/id/Z/ZE/ZEFRAM/Perl4-CoreLibs-0.003.tar.gz",
-        "msg" => "http://search.mcpan.org/CPAN/authors/id/Z/ZE/ZEFRAM/Perl4-CoreLibs-0.003.tar.gz should be `https://cpan.metacpan.org/authors/id/Z/ZE/ZEFRAM/Perl4-CoreLibs-0.003.tar.gz`",
+        "msg" => "http://search.mcpan.org/CPAN/authors/id/Z/ZE/ZEFRAM/Perl4-CoreLibs-0.003.tar.gz should be " \
+                 "`https://cpan.metacpan.org/authors/id/Z/ZE/ZEFRAM/Perl4-CoreLibs-0.003.tar.gz`",
         "col" => 2,
       }, {
         "url" => "http://ftp.gnome.org/pub/GNOME/binaries/mac/banshee/banshee-2.macosx.intel.dmg",
-        "msg" => "http://ftp.gnome.org/pub/GNOME/binaries/mac/banshee/banshee-2.macosx.intel.dmg should be `https://download.gnome.org/binaries/mac/banshee/banshee-2.macosx.intel.dmg`",
+        "msg" => "http://ftp.gnome.org/pub/GNOME/binaries/mac/banshee/banshee-2.macosx.intel.dmg should be " \
+                 "`https://download.gnome.org/binaries/mac/banshee/banshee-2.macosx.intel.dmg`",
         "col" => 2,
       }, {
         "url" => "git://anonscm.debian.org/users/foo/foostrap.git",
-        "msg" => "git://anonscm.debian.org/users/foo/foostrap.git should be `https://anonscm.debian.org/git/users/foo/foostrap.git`",
+        "msg" => "git://anonscm.debian.org/users/foo/foostrap.git should be " \
+                 "`https://anonscm.debian.org/git/users/foo/foostrap.git`",
         "col" => 2,
       }, {
         "url" => "ftp://ftp.mirrorservice.org/foo-1.tar.gz",
@@ -39,15 +42,18 @@ describe RuboCop::Cop::FormulaAudit::Urls do
         "col" => 2,
       }, {
         "url" => "http://sourceforge.net/projects/something/files/Something-1.2.3.dmg",
-        "msg" => "Use https://downloads.sourceforge.net to get geolocation (url is http://sourceforge.net/projects/something/files/Something-1.2.3.dmg).",
+        "msg" => "Use https://downloads.sourceforge.net to get geolocation (url is " \
+                 "http://sourceforge.net/projects/something/files/Something-1.2.3.dmg).",
         "col" => 2,
       }, {
         "url" => "https://downloads.sourceforge.net/project/foo/download",
-        "msg" => "Don't use /download in SourceForge urls (url is https://downloads.sourceforge.net/project/foo/download).",
+        "msg" => "Don't use /download in SourceForge urls (url is " \
+                 "https://downloads.sourceforge.net/project/foo/download).",
         "col" => 2,
       }, {
         "url" => "https://sourceforge.net/project/foo",
-        "msg" => "Use https://downloads.sourceforge.net to get geolocation (url is https://sourceforge.net/project/foo).",
+        "msg" => "Use https://downloads.sourceforge.net to get geolocation " \
+                 "(url is https://sourceforge.net/project/foo).",
         "col" => 2,
       }, {
         "url" => "http://prdownloads.sourceforge.net/foo/foo-1.tar.gz",
@@ -58,7 +64,8 @@ describe RuboCop::Cop::FormulaAudit::Urls do
         "col" => 2,
       }, {
         "url" => "http://foo.dl.sourceforge.net/sourceforge/foozip/foozip_1.0.tar.bz2",
-        "msg" => "Don't use specific dl mirrors in SourceForge urls (url is http://foo.dl.sourceforge.net/sourceforge/foozip/foozip_1.0.tar.bz2).",
+        "msg" => "Don't use specific dl mirrors in SourceForge urls (url is " \
+                 "http://foo.dl.sourceforge.net/sourceforge/foozip/foozip_1.0.tar.bz2).",
         "col" => 2,
       }, {
         "url" => "http://downloads.sourceforge.net/project/foo/foo/2/foo-2.zip",
@@ -69,8 +76,32 @@ describe RuboCop::Cop::FormulaAudit::Urls do
         "msg" => <<~EOS,
           Please use a secure mirror for Debian URLs.
           We recommend:
-            https://mirrors.ocf.berkeley.edu/debian/dists/foo/
+            https://deb.debian.org/debian/dists/foo/
         EOS
+        "col" => 2,
+      }, {
+        "url" => "https://mirrors.kernel.org/debian/pool/main/n/nc6/foo.tar.gz",
+        "msg" => "Please use " \
+                 "https://deb.debian.org/debian/ for " \
+                 "https://mirrors.kernel.org/debian/pool/main/n/nc6/foo.tar.gz",
+        "col" => 2,
+      }, {
+        "url" => "https://mirrors.ocf.berkeley.edu/debian/pool/main/m/mkcue/foo.tar.gz",
+        "msg" => "Please use " \
+                 "https://deb.debian.org/debian/ for " \
+                 "https://mirrors.ocf.berkeley.edu/debian/pool/main/m/mkcue/foo.tar.gz",
+        "col" => 2,
+      }, {
+        "url" => "https://mirrorservice.org/sites/ftp.debian.org/debian/pool/main/n/netris/foo.tar.gz",
+        "msg" => "Please use " \
+                 "https://deb.debian.org/debian/ for " \
+                 "https://mirrorservice.org/sites/ftp.debian.org/debian/pool/main/n/netris/foo.tar.gz",
+        "col" => 2,
+      }, {
+        "url" => "https://www.mirrorservice.org/sites/ftp.debian.org/debian/pool/main/n/netris/foo.tar.gz",
+        "msg" => "Please use " \
+                 "https://deb.debian.org/debian/ for " \
+                 "https://www.mirrorservice.org/sites/ftp.debian.org/debian/pool/main/n/netris/foo.tar.gz",
         "col" => 2,
       }, {
         "url" => "http://foo.googlecode.com/files/foo-1.0.zip",
@@ -107,7 +138,8 @@ describe RuboCop::Cop::FormulaAudit::Urls do
         "col" => 2,
       }, {
         "url" => "https://central.maven.org/maven2/com/bar/foo/1.1/foo-1.1.jar",
-        "msg" => "https://central.maven.org/maven2/com/bar/foo/1.1/foo-1.1.jar should be `https://search.maven.org/remotecontent?filepath=com/bar/foo/1.1/foo-1.1.jar`",
+        "msg" => "https://central.maven.org/maven2/com/bar/foo/1.1/foo-1.1.jar should be " \
+                 "`https://search.maven.org/remotecontent?filepath=com/bar/foo/1.1/foo-1.1.jar`",
         "col" => 2,
       }]
       formulas.each do |formula|
@@ -117,11 +149,11 @@ describe RuboCop::Cop::FormulaAudit::Urls do
             url "#{formula["url"]}"
           end
         RUBY
-        expected_offenses = [{ message: formula["msg"],
+        expected_offenses = [{ message:  formula["msg"],
                                severity: :convention,
-                               line: 3,
-                               column: formula["col"],
-                               source: source }]
+                               line:     3,
+                               column:   formula["col"],
+                               source:   source }]
 
         inspect_source(source)
 

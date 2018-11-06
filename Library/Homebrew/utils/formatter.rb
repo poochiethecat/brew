@@ -31,6 +31,10 @@ module Formatter
     label(label, string, :red)
   end
 
+  def wrap(s, width = 172)
+    s.gsub(/(.{1,#{width}})(\s+|\Z)/, "\\1\n")
+  end
+
   def url(string)
     "#{Tty.underline}#{string}#{Tty.no_underline}"
   end
@@ -93,29 +97,5 @@ module Formatter
     end
 
     output
-  end
-
-  def pluralize(count, singular, plural = nil, show_count: true)
-    return (show_count ? "#{count} #{singular}" : singular.to_s) if count == 1
-
-    *adjectives, noun = singular.to_s.split(" ")
-
-    plural ||= {
-      "formula" => "formulae",
-    }.fetch(noun, "#{noun}s")
-
-    words = adjectives.push(plural).join(" ")
-
-    show_count ? "#{count} #{words}" : words
-  end
-
-  def comma_and(*items)
-    # TODO: Remove when RuboCop 0.57.3 is released.
-    # False positive has been fixed and merged, but is not yet in a
-    # stable release: https://github.com/rubocop-hq/rubocop/pull/6038
-    *items, last = items.map(&:to_s) # rubocop:disable Lint/ShadowedArgument
-    return last if items.empty?
-
-    "#{items.join(", ")} and #{last}"
   end
 end

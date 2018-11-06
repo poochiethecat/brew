@@ -4,12 +4,14 @@ require "metafiles"
 module DiskUsageExtension
   def disk_usage
     return @disk_usage if @disk_usage
+
     compute_disk_usage
     @disk_usage
   end
 
   def file_count
     return @file_count if @file_count
+
     compute_disk_usage
     @file_count
   end
@@ -24,6 +26,12 @@ module DiskUsageExtension
   private
 
   def compute_disk_usage
+    if symlink? && !exist?
+      @file_count = 1
+      @disk_usage = 0
+      return
+    end
+
     path = if symlink?
       resolved_path
     else
@@ -62,7 +70,7 @@ class Pathname
   include DiskUsageExtension
 
   # @private
-  BOTTLE_EXTNAME_RX = /(\.[a-z0-9_]+\.bottle\.(\d+\.)?tar\.gz)$/
+  BOTTLE_EXTNAME_RX = /(\.[a-z0-9_]+\.bottle\.(\d+\.)?tar\.gz)$/.freeze
 
   # Moves a file from the original location to the {Pathname}'s.
   def install(*sources)
@@ -137,9 +145,10 @@ class Pathname
   # @private
   alias old_write write
 
-  # we assume this pathname object is a file obviously
+  # We assume this pathname object is a file, obviously
   def write(content, *open_args)
     raise "Will not overwrite #{self}" if exist?
+
     dirname.mkpath
     open("w", *open_args) { |f| f.write(content) }
   end
@@ -147,49 +156,26 @@ class Pathname
   # Only appends to a file that is already created.
   def append_lines(content, *open_args)
     raise "Cannot append file that doesn't exist: #{self}" unless exist?
+
     open("a", *open_args) { |f| f.puts(content) }
   end
 
-  # NOTE always overwrites
+  # NOTE: This always overwrites.
   def atomic_write(content)
-    require "tempfile"
-    tf = Tempfile.new(basename.to_s, dirname)
-    begin
-      tf.binmode
-      tf.write(content)
-
+    # The enclosing `mktmpdir` and the `chmod` are a workaround
+    # for https://github.com/rails/rails/pull/34037.
+    Dir.mktmpdir(".d", dirname) do |tmpdir|
+      should_fix_sticky_bit = dirname.world_writable? && !dirname.sticky?
+      FileUtils.chmod "+t", dirname if should_fix_sticky_bit
       begin
-        old_stat = stat
-      rescue Errno::ENOENT
-        old_stat = default_stat
+        File.atomic_write(self, tmpdir) do |file|
+          file.write(content)
+        end
+      ensure
+        FileUtils.chmod "-t", dirname if should_fix_sticky_bit
       end
-
-      uid = Process.uid
-      gid = Process.groups.delete(old_stat.gid) { Process.gid }
-
-      begin
-        tf.chown(uid, gid)
-        tf.chmod(old_stat.mode)
-      rescue Errno::EPERM # rubocop:disable Lint/HandleExceptions
-      end
-
-      # Close the file before renaming to prevent the error: Device or resource busy
-      # Affects primarily NFS.
-      tf.close
-      File.rename(tf.path, self)
-    ensure
-      tf.close!
     end
   end
-
-  def default_stat
-    sentinel = parent.join(".brew.#{Process.pid}.#{rand(Time.now.to_i)}")
-    sentinel.open("w") {}
-    sentinel.stat
-  ensure
-    sentinel.unlink
-  end
-  private :default_stat
 
   # @private
   def cp_path_sub(pattern, replacement)
@@ -211,7 +197,7 @@ class Pathname
   # @private
   alias extname_old extname
 
-  # extended to support common double extensions
+  # Extended to support common double extensions
   def extname(path = to_s)
     basename = File.basename(path)
 
@@ -222,12 +208,12 @@ class Pathname
     return archive_ext if archive_ext
 
     # Don't treat version numbers as extname.
-    return "" if basename.match?(/\b\d+\.\d+[^\.]*\Z/)
+    return "" if basename.match?(/\b\d+\.\d+[^\.]*\Z/) && !basename.end_with?(".7z")
 
     File.extname(basename)
   end
 
-  # for filetypes we support, basename without extension
+  # For filetypes we support, basename without extension
   def stem
     File.basename((path = to_s), extname(path))
   end
@@ -268,6 +254,7 @@ class Pathname
 
   def verify_checksum(expected)
     raise ChecksumMissingError if expected.nil? || expected.empty?
+
     actual = Checksum.new(expected.hash_type, send(expected.hash_type).downcase)
     raise ChecksumMismatchError.new(self, expected, actual) unless expected == actual
   end
@@ -358,13 +345,14 @@ class Pathname
     dst.mkpath
     Pathname.glob("#{self}/*") do |file|
       next if file.directory?
+
       dst.install(file)
       new_file = dst.join(file.basename)
       file.write_env_script(new_file, env)
     end
   end
 
-  # Writes an exec script that invokes a java jar
+  # Writes an exec script that invokes a Java jar
   def write_jar_script(target_jar, script_name, java_opts = "", java_version: nil)
     mkpath
     java_home = if java_version
@@ -380,11 +368,13 @@ class Pathname
     Pathname(from).children.each do |p|
       next if p.directory?
       next unless Metafiles.copy?(p.basename.to_s)
+
       # Some software symlinks these files (see help2man.rb)
       filename = p.resolved_path
       # Some software links metafiles together, so by the time we iterate to one of them
       # we may have already moved it. libxml2's COPYING and Copyright are affected by this.
       next unless filename.exist?
+
       filename.chmod 0644
       install(filename)
     end

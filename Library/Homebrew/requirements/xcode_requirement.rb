@@ -6,13 +6,14 @@ class XcodeRequirement < Requirement
   satisfy(build_env: false) { xcode_installed_version }
 
   def initialize(tags = [])
-    @version = tags.find { |tag| tags.delete(tag) if tag =~ /(\d\.)+\d/ }
-    super
+    @version = tags.shift if tags.first.to_s.match?(/(\d\.)+\d/)
+    super(tags)
   end
 
   def xcode_installed_version
     return false unless MacOS::Xcode.installed?
     return true unless @version
+
     MacOS::Xcode.version >= @version
   end
 
@@ -39,6 +40,6 @@ class XcodeRequirement < Requirement
   end
 
   def inspect
-    "#<#{self.class.name}: #{name.inspect} #{tags.inspect} version=#{@version.inspect}>"
+    "#<#{self.class.name}: #{tags.inspect} version=#{@version.inspect}>"
   end
 end

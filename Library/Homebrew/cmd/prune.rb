@@ -6,17 +6,36 @@
 #:    actually remove anything.
 
 require "keg"
+require "cli_parser"
 
 module Homebrew
   module_function
 
+  def prune_args
+    Homebrew::CLI::Parser.new do
+      usage_banner <<~EOS
+        `prune` [<options>]
+
+        Remove dead symlinks from the Homebrew prefix. This is generally not
+        needed, but can be useful when doing DIY installations.
+      EOS
+      switch "-n", "--dry-run",
+        description: "Show what would be removed, but do not actually remove anything."
+      switch :verbose
+      switch :debug
+    end
+  end
+
   def prune
+    prune_args.parse
+
     ObserverPathnameExtension.reset_counts!
 
     dirs = []
 
-    Keg::PRUNEABLE_DIRECTORIES.each do |dir|
+    Keg::MUST_EXIST_SUBDIRECTORIES.each do |dir|
       next unless dir.directory?
+
       dir.find do |path|
         path.extend(ObserverPathnameExtension)
         if path.symlink?
@@ -25,13 +44,13 @@ module Homebrew
               path.uninstall_info unless ARGV.dry_run?
             end
 
-            if ARGV.dry_run?
+            if args.dry_run?
               puts "Would remove (broken link): #{path}"
             else
               path.unlink
             end
           end
-        elsif path.directory? && !Keg::PRUNEABLE_DIRECTORIES.include?(path)
+        elsif path.directory? && !Keg::MUST_EXIST_SUBDIRECTORIES.include?(path)
           dirs << path
         end
       end
@@ -45,10 +64,10 @@ module Homebrew
       end
     end
 
-    return if ARGV.dry_run?
+    return if args.dry_run?
 
     if ObserverPathnameExtension.total.zero?
-      puts "Nothing pruned" if ARGV.verbose?
+      puts "Nothing pruned" if args.verbose?
     else
       n, d = ObserverPathnameExtension.counts
       print "Pruned #{n} symbolic links "

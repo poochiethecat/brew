@@ -2,13 +2,16 @@
 #:  * `vendor-install` [<target>]:
 #:     Install vendor version of Homebrew dependencies.
 
-# Hide shellcheck complaint:
-# shellcheck source=/dev/null
+# Don't need shellcheck to follow this `source`.
+# shellcheck disable=SC1090
 source "$HOMEBREW_LIBRARY/Homebrew/utils/lock.sh"
 
 VENDOR_DIR="$HOMEBREW_LIBRARY/Homebrew/vendor"
 
 # Built from https://github.com/Homebrew/homebrew-portable-ruby.
+#
+# Dynamic variables can't be detected by shellcheck
+# shellcheck disable=SC2034
 if [[ -n "$HOMEBREW_MACOS" ]]
 then
   if [[ "$HOMEBREW_PROCESSOR" = "Intel" ]]
@@ -24,6 +27,11 @@ then
       ruby_URL="$HOMEBREW_BOTTLE_DOMAIN/bottles-portable-ruby/portable-ruby-2.3.7.x86_64_linux.bottle.tar.gz"
       ruby_URL2="https://github.com/Homebrew/homebrew-portable-ruby/releases/download/2.3.7/portable-ruby-2.3.7.x86_64_linux.bottle.tar.gz"
       ruby_SHA="9df214085a0e566a580eea3dd9eab14a2a94930ff74fbf97fb1284e905c8921d"
+      ;;
+    armv[67]*)
+      ruby_URL="$HOMEBREW_BOTTLE_DOMAIN/bottles-portable-ruby/portable-ruby-2.3.7.armv6_linux.bottle.tar.gz"
+      ruby_URL2="https://github.com/Homebrew/homebrew-portable-ruby/releases/download/2.3.7/portable-ruby-2.3.7.armv6_linux.bottle.tar.gz"
+      ruby_SHA="17dce8965d7c935ec1dd0c5bb0be937b685ffe65529141d9e6ed78f4925b4570"
       ;;
   esac
 fi
@@ -147,7 +155,6 @@ EOS
 
 install() {
   local tar_args
-  local verb
 
   if [[ -n "$HOMEBREW_VERBOSE" ]]
   then
@@ -163,13 +170,7 @@ install() {
 
   if [[ -d "$VENDOR_VERSION" ]]
   then
-    verb="reinstall"
     mv "$VENDOR_VERSION" "$VENDOR_VERSION.reinstall"
-  elif [[ -n "$(ls -A .)" ]]
-  then
-    verb="upgrade"
-  else
-    verb="install"
   fi
 
   safe_cd "$VENDOR_DIR"
@@ -180,8 +181,6 @@ install() {
   if quiet_stderr "./$VENDOR_VERSION/bin/$VENDOR_NAME" --version >/dev/null
   then
     ln -sfn "$VENDOR_VERSION" current
-    # remove old vendor installations by sorting files with modified time.
-    ls -t | grep -Ev "^(current|$VENDOR_VERSION)" | tail -n +4 | xargs rm -rf
     if [[ -d "$VENDOR_VERSION.reinstall" ]]
     then
       rm -rf "$VENDOR_VERSION.reinstall"
@@ -192,7 +191,7 @@ install() {
     then
       mv "$VENDOR_VERSION.reinstall" "$VENDOR_VERSION"
     fi
-    odie "Failed to $verb vendor $VENDOR_NAME."
+    odie "Failed to vendor $VENDOR_NAME $VENDOR_VERSION."
   fi
 
   trap - SIGINT

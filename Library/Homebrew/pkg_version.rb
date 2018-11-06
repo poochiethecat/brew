@@ -3,7 +3,7 @@ require "version"
 class PkgVersion
   include Comparable
 
-  RX = /\A(.+?)(?:_(\d+))?\z/
+  RX = /\A(.+?)(?:_(\d+))?\z/.freeze
 
   attr_reader :version, :revision
 
@@ -33,6 +33,7 @@ class PkgVersion
 
   def <=>(other)
     return unless other.is_a?(PkgVersion)
+
     (version <=> other.version).nonzero? || revision <=> other.revision
   end
   alias eql? ==

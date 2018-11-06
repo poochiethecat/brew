@@ -1,14 +1,14 @@
 require "linkage_cache_store"
 
 describe LinkageCacheStore do
+  subject { described_class.new(keg_name, database) }
+
   let(:keg_name) { "keg_name" }
   let(:database) { double("database") }
 
-  subject { LinkageCacheStore.new(keg_name, database) }
-
   describe "#keg_exists?" do
     context "`keg_name` exists in cache" do
-      before(:each) do
+      before do
         expect(database).to receive(:get).with(keg_name).and_return("")
       end
 
@@ -18,7 +18,7 @@ describe LinkageCacheStore do
     end
 
     context "`keg_name` does not exist in cache" do
-      before(:each) do
+      before do
         expect(database).to receive(:get).with(keg_name).and_return(nil)
       end
 
@@ -43,27 +43,27 @@ describe LinkageCacheStore do
     end
   end
 
-  describe "#flush_cache!" do
+  describe "#delete!" do
     it "calls `delete` on the `database` with `keg_name` as parameter" do
       expect(database).to receive(:delete).with(keg_name)
-      subject.flush_cache!
+      subject.delete!
     end
   end
 
-  describe "#fetch_type" do
+  describe "#fetch" do
     context "`HASH_LINKAGE_TYPES.include?(type)`" do
-      before(:each) do
+      before do
         expect(database).to receive(:get).with(keg_name).and_return(nil)
       end
 
       it "returns a `Hash` of values" do
-        expect(subject.fetch_type(:keg_files_dylibs)).to be_an_instance_of(Hash)
+        expect(subject.fetch(:keg_files_dylibs)).to be_an_instance_of(Hash)
       end
     end
 
     context "`type` not in `HASH_LINKAGE_TYPES`" do
       it "raises a `TypeError` if the `type` is not supported" do
-        expect { subject.fetch_type(:bad_type) }.to raise_error(TypeError)
+        expect { subject.fetch(:bad_type) }.to raise_error(TypeError)
       end
     end
   end

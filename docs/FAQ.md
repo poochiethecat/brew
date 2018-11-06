@@ -26,7 +26,7 @@ To allow that formulae to update again:
 
     brew unpin <formula>
 
-Note that pinned, outdated formulae that are depended on by another formula need to be upgraded when required as we do not allow formulae to be built against non-latest versions.
+Note that pinned, outdated formulae that another formula depends on need to be upgraded when required as we do not allow formulae to be built against non-latest versions.
 
 ## How do I uninstall old versions of a formula?
 By default, Homebrew does not uninstall old versions of a formula, so
@@ -57,7 +57,7 @@ If you do not uninstall all of the versions that Homebrew has installed,
 Homebrew will continue to attempt to install the newest version it knows
 about when you run `brew upgrade`. This can be surprising.
 
-To remove a formula entirely, you may run `brew uninstall formula_name --force`.
+To remove a formula entirely, you may run `brew uninstall --force <formula>`.
 
 Be careful as this is a destructive operation.
 
@@ -69,14 +69,14 @@ Which is usually: `~/Library/Caches/Homebrew`
 
 ## My Mac `.app`s don’t find `/usr/local/bin` utilities!
 GUI apps on macOS don’t have `/usr/local/bin` in their `PATH` by
-default.  If you’re on Mountain Lion or later, you can fix this by
+default. If you’re on Mountain Lion or later, you can fix this by
 running `sudo launchctl config user path "/usr/local/bin:$PATH"` and
 then rebooting, as documented in `man launchctl`. Note that this sets
-the launchctl PATH for _all users_. For earlier versions of macOS, see
+the launchctl PATH for *all users*. For earlier versions of macOS, see
 [this page](https://developer.apple.com/legacy/library/qa/qa1067/_index.html).
 
 ## How do I contribute to Homebrew?
-Read [CONTRIBUTING.md](https://github.com/Homebrew/brew/blob/master/CONTRIBUTING.md).
+Read our [contribution guidelines](https://github.com/Homebrew/brew/blob/master/CONTRIBUTING.md#contributing-to-homebrew).
 
 ## Why do you compile everything?
 Homebrew provides pre-compiled versions for many formulae. These
@@ -88,7 +88,7 @@ following conditions:
 
 * Options were passed to the install command, i.e. `brew install <formula>`
 will use a bottled version of the formula, but
-`brew install <formula> --enable-bar` will trigger a source build.
+`brew install --enable-bar <formula>` will trigger a source build.
 * The `--build-from-source` option is invoked.
 * The environment variable `HOMEBREW_BUILD_FROM_SOURCE` is set
 (intended for developers only).
@@ -107,10 +107,6 @@ brew update
 cd $(brew --repository)
 hub pull someone_else
 ```
-
-Or:
-
-    brew install https://raw.github.com/user/repo/branch/formula.rb
 
 Or:
 
@@ -142,7 +138,7 @@ anyway.
 Homebrew refuses to work using sudo.
 
 You should only ever sudo a tool you trust. Of course, you can trust Homebrew
-;) But do you trust the multi-megabyte Makefile that Homebrew runs? Developers
+😉 But do you trust the multi-megabyte Makefile that Homebrew runs? Developers
 often understand C++ far better than they understand make syntax. It’s too high
 a risk to sudo such stuff. It could modify (or upload) any files on your
 system.And indeed, we’ve seen some build scripts try to modify `/usr` even when
@@ -205,9 +201,9 @@ our analytics identified it was not widely used.
 
 ## Homebrew is a poor name, it's too generic, why was it chosen?
 @mxcl was too concerned with the beer theme and didn’t consider that the
-project may actually prove popular. By the time he realized it was, it was too
+project may actually prove popular. By the time he realised it was, it was too
 late. However, today, the first Google hit for “homebrew” is not beer
-related ;-)
+related ;&#8209;)
 
 ## What does "keg-only" mean?
 It means the formula is installed only into the Cellar; it is not linked

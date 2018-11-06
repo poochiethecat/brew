@@ -6,7 +6,7 @@ shared_examples "#uninstall_phase or #zap_phase" do
   subject { artifact.public_send(:"#{artifact_dsl_key}_phase", command: fake_system_command) }
 
   context "using :launchctl" do
-    let(:cask) { Hbc::CaskLoader.load(cask_path("with-#{artifact_dsl_key}-launchctl")) }
+    let(:cask) { Cask::CaskLoader.load(cask_path("with-#{artifact_dsl_key}-launchctl")) }
     let(:launchctl_list_cmd) { %w[/bin/launchctl list my.fancy.package.service] }
     let(:launchctl_remove_cmd) { %w[/bin/launchctl remove my.fancy.package.service] }
     let(:unknown_response) { "launchctl list returned unknown response\n" }
@@ -61,16 +61,16 @@ shared_examples "#uninstall_phase or #zap_phase" do
   context "using :pkgutil" do
     let(:fake_system_command) { class_double(SystemCommand) }
 
-    let(:cask) { Hbc::CaskLoader.load(cask_path("with-#{artifact_dsl_key}-pkgutil")) }
+    let(:cask) { Cask::CaskLoader.load(cask_path("with-#{artifact_dsl_key}-pkgutil")) }
 
     let(:main_pkg_id) { "my.fancy.package.main" }
     let(:agent_pkg_id) { "my.fancy.package.agent" }
 
     it "is supported" do
-      main_pkg = Hbc::Pkg.new(main_pkg_id, fake_system_command)
-      agent_pkg = Hbc::Pkg.new(agent_pkg_id, fake_system_command)
+      main_pkg = Cask::Pkg.new(main_pkg_id, fake_system_command)
+      agent_pkg = Cask::Pkg.new(agent_pkg_id, fake_system_command)
 
-      expect(Hbc::Pkg).to receive(:all_matching).and_return(
+      expect(Cask::Pkg).to receive(:all_matching).and_return(
         [
           main_pkg,
           agent_pkg,
@@ -85,7 +85,7 @@ shared_examples "#uninstall_phase or #zap_phase" do
   end
 
   context "using :kext" do
-    let(:cask) { Hbc::CaskLoader.load(cask_path("with-#{artifact_dsl_key}-kext")) }
+    let(:cask) { Cask::CaskLoader.load(cask_path("with-#{artifact_dsl_key}-kext")) }
     let(:kext_id) { "my.fancy.package.kernelextension" }
 
     it "is supported" do
@@ -110,7 +110,7 @@ shared_examples "#uninstall_phase or #zap_phase" do
   end
 
   context "using :quit" do
-    let(:cask) { Hbc::CaskLoader.load(cask_path("with-#{artifact_dsl_key}-quit")) }
+    let(:cask) { Cask::CaskLoader.load(cask_path("with-#{artifact_dsl_key}-quit")) }
     let(:bundle_id) { "my.fancy.package.app" }
     let(:quit_application_script) do
       %Q(tell application id "#{bundle_id}" to quit)
@@ -130,7 +130,7 @@ shared_examples "#uninstall_phase or #zap_phase" do
   end
 
   context "using :signal" do
-    let(:cask) { Hbc::CaskLoader.load(cask_path("with-#{artifact_dsl_key}-signal")) }
+    let(:cask) { Cask::CaskLoader.load(cask_path("with-#{artifact_dsl_key}-signal")) }
     let(:bundle_id) { "my.fancy.package.app" }
     let(:signals) { %w[TERM KILL] }
     let(:unix_pids) { [12_345, 67_890] }
@@ -158,6 +158,8 @@ shared_examples "#uninstall_phase or #zap_phase" do
       let(:glob_path1) { Pathname.new("#{dir}/glob_path1") }
       let(:glob_path2) { Pathname.new("#{dir}/glob_path2") }
       let(:paths) { [absolute_path, path_with_tilde, glob_path1, glob_path2] }
+      let(:fake_system_command) { NeverSudoSystemCommand }
+      let(:cask) { Cask::CaskLoader.load(cask_path("with-#{artifact_dsl_key}-#{directive}")) }
 
       around(:each) do |example|
         begin
@@ -171,11 +173,8 @@ shared_examples "#uninstall_phase or #zap_phase" do
         end
       end
 
-      let(:fake_system_command) { NeverSudoSystemCommand }
-      let(:cask) { Hbc::CaskLoader.load(cask_path("with-#{artifact_dsl_key}-#{directive}")) }
-
       before(:each) do
-        allow_any_instance_of(Hbc::Artifact::AbstractUninstall).to receive(:trash_paths)
+        allow_any_instance_of(Cask::Artifact::AbstractUninstall).to receive(:trash_paths)
           .and_wrap_original do |method, *args|
             result = method.call(*args)
             FileUtils.rm_rf result.stdout.split("\0")
@@ -183,9 +182,7 @@ shared_examples "#uninstall_phase or #zap_phase" do
       end
 
       it "is supported" do
-        paths.each do |path|
-          expect(path).to exist
-        end
+        expect(paths).to all(exist)
 
         subject
 
@@ -198,7 +195,7 @@ shared_examples "#uninstall_phase or #zap_phase" do
 
   context "using :rmdir" do
     let(:fake_system_command) { NeverSudoSystemCommand }
-    let(:cask) { Hbc::CaskLoader.load(cask_path("with-#{artifact_dsl_key}-rmdir")) }
+    let(:cask) { Cask::CaskLoader.load(cask_path("with-#{artifact_dsl_key}-rmdir")) }
     let(:empty_directory) { Pathname.new("#{TEST_TMPDIR}/empty_directory_path") }
     let(:ds_store) { empty_directory.join(".DS_Store") }
 
@@ -226,7 +223,7 @@ shared_examples "#uninstall_phase or #zap_phase" do
     context "using #{script_type.inspect}" do
       let(:fake_system_command) { NeverSudoSystemCommand }
       let(:token) { "with-#{artifact_dsl_key}-#{script_type}".tr("_", "-") }
-      let(:cask) { Hbc::CaskLoader.load(cask_path(token.to_s)) }
+      let(:cask) { Cask::CaskLoader.load(cask_path(token.to_s)) }
       let(:script_pathname) { cask.staged_path.join("MyFancyPkg", "FancyUninstaller.tool") }
 
       it "is supported" do
@@ -239,10 +236,10 @@ shared_examples "#uninstall_phase or #zap_phase" do
 
         expect(fake_system_command).to receive(:run).with(
           cask.staged_path.join("MyFancyPkg", "FancyUninstaller.tool"),
-          args: ["--please"],
+          args:         ["--please"],
           must_succeed: true,
           print_stdout: true,
-          sudo: false,
+          sudo:         false,
         )
 
         InstallHelper.install_without_artifacts(cask)
@@ -252,7 +249,7 @@ shared_examples "#uninstall_phase or #zap_phase" do
   end
 
   context "using :login_item" do
-    let(:cask) { Hbc::CaskLoader.load(cask_path("with-#{artifact_dsl_key}-login-item")) }
+    let(:cask) { Cask::CaskLoader.load(cask_path("with-#{artifact_dsl_key}-login-item")) }
 
     it "is supported" do
       FakeSystemCommand.expects_command(

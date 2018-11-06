@@ -5,14 +5,14 @@ end
 std_trap = trap("INT") { exit! 130 } # no backtrace thanks
 
 # check ruby version before requiring any modules.
-RUBY_VERSION_SPLIT = RUBY_VERSION.split "."
-RUBY_X = RUBY_VERSION_SPLIT[0].to_i
-RUBY_Y = RUBY_VERSION_SPLIT[1].to_i
+RUBY_X, RUBY_Y, = RUBY_VERSION.split(".").map(&:to_i)
 if RUBY_X < 2 || (RUBY_X == 2 && RUBY_Y < 3)
   raise "Homebrew must be run under Ruby 2.3! You're running #{RUBY_VERSION}."
 end
 
 require_relative "global"
+
+require "update_migrator"
 
 begin
   trap("INT", std_trap) # restore default CTRL-C handler
@@ -37,8 +37,8 @@ begin
   homebrew_path = PATH.new(ENV["HOMEBREW_PATH"])
 
   # Add SCM wrappers.
-  path.append(HOMEBREW_SHIMS_PATH/"scm")
-  homebrew_path.append(HOMEBREW_SHIMS_PATH/"scm")
+  path.prepend(HOMEBREW_SHIMS_PATH/"scm")
+  homebrew_path.prepend(HOMEBREW_SHIMS_PATH/"scm")
 
   ENV["PATH"] = path
 
@@ -49,8 +49,10 @@ begin
       internal_dev_cmd = require? HOMEBREW_LIBRARY_PATH/"dev-cmd"/cmd
       internal_cmd = internal_dev_cmd
       if internal_dev_cmd && !ARGV.homebrew_developer?
-        system "git", "config", "--file=#{HOMEBREW_REPOSITORY}/.git/config",
-                                "--replace-all", "homebrew.devcmdrun", "true"
+        if (HOMEBREW_REPOSITORY/".git/config").exist?
+          system "git", "config", "--file=#{HOMEBREW_REPOSITORY}/.git/config",
+                                  "--replace-all", "homebrew.devcmdrun", "true"
+        end
         ENV["HOMEBREW_DEV_CMD_RUN"] = "1"
       end
     end
@@ -76,7 +78,7 @@ begin
   end
 
   # Migrate LinkedKegs/PinnedKegs if update didn't already do so
-  migrate_legacy_keg_symlinks_if_necessary
+  UpdateMigrator.migrate_legacy_keg_symlinks_if_necessary
 
   # Uninstall old brew-cask if it's still around; we just use the tap now.
   if cmd == "cask" && (HOMEBREW_CELLAR/"brew-cask").exist?
@@ -114,7 +116,7 @@ rescue UsageError => e
   require "help"
   Homebrew::Help.help cmd, usage_error: e.message
 rescue SystemExit => e
-  onoe "Kernel.exit" if ARGV.verbose? && !e.success?
+  onoe "Kernel.exit" if ARGV.debug? && !e.success?
   $stderr.puts e.backtrace if ARGV.debug?
   raise
 rescue Interrupt
@@ -126,6 +128,7 @@ rescue BuildError => e
   exit 1
 rescue RuntimeError, SystemCallError => e
   raise if e.message.empty?
+
   onoe e
   $stderr.puts e.backtrace if ARGV.debug?
   exit 1

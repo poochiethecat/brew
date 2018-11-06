@@ -1,5 +1,5 @@
 #:  * `update-test` [`--commit=`<commit>] [`--before=`<date>] [`--to-tag`] [`--keep-tmp`]:
-#:    Runs a test of `brew update` with a new repository clone.
+#:    Run a test of `brew update` with a new repository clone.
 #:
 #:    If no arguments are passed, use `origin/master` as the start commit.
 #:
@@ -19,15 +19,29 @@ require "cli_parser"
 module Homebrew
   module_function
 
-  def update_test
-    Homebrew::CLI::Parser.parse do
-      switch "--to-tag"
-      switch "--keep-tmp"
+  def update_test_args
+    Homebrew::CLI::Parser.new do
+      usage_banner <<~EOS
+        `update-test` [<options>]
+
+        Run a test of `brew update` with a new repository clone.
+        If no arguments are passed, use `origin/master` as the start commit.
+      EOS
+      switch "--to-tag",
+        description: "Set `HOMEBREW_UPDATE_TO_TAG` to test updating between tags."
+      switch "--keep-tmp",
+        description: "Retain the temporary directory containing the new repository clone."
+      flag   "--commit=",
+        description: "Use provided <commit> as the start commit."
+      flag   "--before=",
+        description: "Use the commit at provided <date> as the start commit."
       switch :verbose
       switch :debug
-      flag   "--commit="
-      flag   "--before="
     end
+  end
+
+  def update_test
+    update_test_args.parse
 
     ENV["HOMEBREW_UPDATE_TEST"] = "1"
 
@@ -46,7 +60,7 @@ module Homebrew
         Utils.popen_read("git", "rev-list", "-n1", "--before=#{date}", "origin/master").chomp
       elsif args.to_tag?
         tags = Utils.popen_read("git", "tag", "--list", "--sort=-version:refname")
-        previous_tag = tags.lines[1]
+        previous_tag = tags.lines.second
         previous_tag ||= begin
           if (HOMEBREW_REPOSITORY/".git/shallow").exist?
             safe_system "git", "fetch", "--tags", "--depth=1"
@@ -54,7 +68,7 @@ module Homebrew
           elsif OS.linux?
             tags = Utils.popen_read("git tag --list | sort -rV")
           end
-          tags.lines[1]
+          tags.lines.second
         end
         previous_tag = previous_tag.to_s.chomp
         odie "Could not find previous tag in:\n#{tags}" if previous_tag.empty?

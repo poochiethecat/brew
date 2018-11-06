@@ -1,6 +1,6 @@
 require "test/support/fixtures/testball"
 require "cleanup"
-require "hbc/cache"
+require "cask/cache"
 require "fileutils"
 
 using CleanupRefinement
@@ -16,7 +16,7 @@ describe CleanupRefinement do
     end
 
     it "returns true when path_modified_time < days_default" do
-      allow_any_instance_of(Pathname).to receive(:mtime).and_return(Time.now - 2 * 60 * 60 * 24)
+      allow_any_instance_of(Pathname).to receive(:mtime).and_return(2.days.ago)
       expect(path.prune?(1)).to be true
     end
 
@@ -27,8 +27,8 @@ describe CleanupRefinement do
 end
 
 describe Homebrew::Cleanup do
-  let(:ds_store) { Pathname.new("#{HOMEBREW_PREFIX}/Library/.DS_Store") }
-  let(:lock_file) { Pathname.new("#{HOMEBREW_LOCK_DIR}/foo") }
+  let(:ds_store) { Pathname.new("#{HOMEBREW_CELLAR}/.DS_Store") }
+  let(:lock_file) { Pathname.new("#{HOMEBREW_LOCKS}/foo") }
 
   around do |example|
     begin
@@ -137,15 +137,15 @@ describe Homebrew::Cleanup do
   end
 
   describe "#cleanup_cask", :cask do
-    before(:each) do
-      Hbc::Cache.path.mkpath
+    before do
+      Cask::Cache.path.mkpath
     end
 
     context "when given a versioned cask" do
-      let(:cask) { Hbc::CaskLoader.load("local-transmission") }
+      let(:cask) { Cask::CaskLoader.load("local-transmission") }
 
       it "removes the download if it is not for the latest version" do
-        download = Hbc::Cache.path/"#{cask.token}--7.8.9"
+        download = Cask::Cache.path/"#{cask.token}--7.8.9"
 
         FileUtils.touch download
 
@@ -155,7 +155,7 @@ describe Homebrew::Cleanup do
       end
 
       it "does not remove downloads for the latest version" do
-        download = Hbc::Cache.path/"#{cask.token}--#{cask.version}"
+        download = Cask::Cache.path/"#{cask.token}--#{cask.version}"
 
         FileUtils.touch download
 
@@ -166,10 +166,10 @@ describe Homebrew::Cleanup do
     end
 
     context "when given a `:latest` cask" do
-      let(:cask) { Hbc::CaskLoader.load("latest-with-appcast") }
+      let(:cask) { Cask::CaskLoader.load("latest-with-appcast") }
 
       it "does not remove the download for the latest version" do
-        download = Hbc::Cache.path/"#{cask.token}--#{cask.version}"
+        download = Cask::Cache.path/"#{cask.token}--#{cask.version}"
 
         FileUtils.touch download
 
@@ -179,9 +179,9 @@ describe Homebrew::Cleanup do
       end
 
       it "removes the download for the latest version after a week" do
-        download = Hbc::Cache.path/"#{cask.token}--#{cask.version}"
+        download = Cask::Cache.path/"#{cask.token}--#{cask.version}"
 
-        FileUtils.touch download, mtime: Time.now - 7 * 60 * 60 * 24
+        FileUtils.touch download, mtime: 7.days.ago - 1.hour
 
         subject.cleanup_cask(cask)
 
@@ -203,13 +203,13 @@ describe Homebrew::Cleanup do
     end
 
     it "cleans up logs if older than 14 days" do
-      allow_any_instance_of(Pathname).to receive(:mtime).and_return(Time.now - 15 * 60 * 60 * 24)
+      allow_any_instance_of(Pathname).to receive(:mtime).and_return(15.days.ago)
       subject.cleanup_logs
       expect(path).not_to exist
     end
 
     it "does not clean up logs less than 14 days old" do
-      allow_any_instance_of(Pathname).to receive(:mtime).and_return(Time.now - 2 * 60 * 60 * 24)
+      allow_any_instance_of(Pathname).to receive(:mtime).and_return(2.days.ago)
       subject.cleanup_logs
       expect(path).to exist
     end
@@ -223,6 +223,24 @@ describe Homebrew::Cleanup do
       subject.cleanup_cache
 
       expect(incomplete).not_to exist
+    end
+
+    it "cleans up 'cargo_cache'" do
+      cargo_cache = (HOMEBREW_CACHE/"cargo_cache")
+      cargo_cache.mkpath
+
+      subject.cleanup_cache
+
+      expect(cargo_cache).not_to exist
+    end
+
+    it "cleans up 'go_cache'" do
+      go_cache = (HOMEBREW_CACHE/"go_cache")
+      go_cache.mkpath
+
+      subject.cleanup_cache
+
+      expect(go_cache).not_to exist
     end
 
     it "cleans up 'glide_home'" do

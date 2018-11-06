@@ -8,8 +8,8 @@
 #:    If `--force` (or `-f`) is specified then always do a slower, full update check even
 #:    if unnecessary.
 
-# Hide shellcheck complaint:
-# shellcheck source=/dev/null
+# Don't need shellcheck to follow this `source`.
+# shellcheck disable=SC1090
 source "$HOMEBREW_LIBRARY/Homebrew/utils/lock.sh"
 
 # Replaces the function in Library/Homebrew/brew.sh to cache the Git executable to
@@ -24,7 +24,12 @@ git() {
 
 git_init_if_necessary() {
   BREW_OFFICIAL_REMOTE="https://github.com/Homebrew/brew"
-  CORE_OFFICIAL_REMOTE="https://github.com/Homebrew/homebrew-core"
+  if [[ -n "$HOMEBREW_MACOS" ]] || [[ -n "$HOMEBREW_FORCE_HOMEBREW_ON_LINUX" ]]
+  then
+    CORE_OFFICIAL_REMOTE="https://github.com/Homebrew/homebrew-core"
+  else
+    CORE_OFFICIAL_REMOTE="https://github.com/Linuxbrew/homebrew-core"
+  fi
 
   safe_cd "$HOMEBREW_REPOSITORY"
   if [[ ! -d ".git" ]]
@@ -416,6 +421,13 @@ EOS
     QUIET_ARGS=()
   fi
 
+  if [[ -z "$HOMEBREW_CURLRC" ]]
+  then
+    CURL_DISABLE_CURLRC_ARGS=(-q)
+  else
+    CURL_DISABLE_CURLRC_ARGS=()
+  fi
+
   # only allow one instance of brew update
   lock update
 
@@ -491,8 +503,10 @@ EOS
           GITHUB_API_ENDPOINT="commits/$UPSTREAM_BRANCH_DIR"
         fi
 
-        UPSTREAM_SHA_HTTP_CODE="$("$HOMEBREW_CURL" --silent --max-time 3 \
-           --output /dev/null --write-out "%{http_code}" \
+        UPSTREAM_SHA_HTTP_CODE="$("$HOMEBREW_CURL" \
+           "${CURL_DISABLE_CURLRC_ARGS[@]}" \
+           --silent --max-time 3 \
+           --location --output /dev/null --write-out "%{http_code}" \
            --dump-header "$DIR/.git/GITHUB_HEADERS" \
            --user-agent "$HOMEBREW_USER_AGENT_CURL" \
            --header "Accept: $GITHUB_API_ACCEPT" \

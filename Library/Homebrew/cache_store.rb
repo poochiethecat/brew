@@ -1,9 +1,8 @@
-require "dbm"
 require "json"
 
 #
 # `CacheStoreDatabase` acts as an interface to a persistent storage mechanism
-# residing in the `HOMEBREW_CACHE`
+# residing in the `HOMEBREW_CACHE`.
 #
 class CacheStoreDatabase
   # Yields the cache store database.
@@ -26,46 +25,67 @@ class CacheStoreDatabase
   # Gets a value from the underlying database (if it already exists).
   def get(key)
     return unless created?
+
     db[key]
   end
 
   # Gets a value from the underlying database (if it already exists).
   def delete(key)
     return unless created?
+
     db.delete(key)
   end
 
-  # Closes the underlying database (if it created and open).
+  # Closes the underlying database (if it is created and open).
   def close_if_open!
-    @db&.close
+    return unless @db
+    cache_path.dirname.mkpath
+    cache_path.atomic_write(JSON.dump(@db))
   end
 
   # Returns `true` if the cache file has been created for the given `@type`
   #
   # @return [Boolean]
   def created?
-    File.exist?(cache_path)
+    cache_path.exist?
+  end
+
+  # Returns the modification time of the cache file (if it already exists).
+  #
+  # @return [Time]
+  def mtime
+    return unless created?
+    cache_path.mtime
+  end
+
+  # Performs a `select` on the underlying database.
+  #
+  # @return [Array]
+  def select(&block)
+    db.select(&block)
+  end
+
+  # Returns `true` if the cache is empty.
+  #
+  # @return [Boolean]
+  def empty?
+    db.empty?
   end
 
   private
-
-  # The mode of any created files will be 0664 (that is, readable and writable
-  # by the owner and the group, and readable by everyone else). Files created
-  # will also be modified by the process' umask value at the time of creation:
-  #   https://docs.oracle.com/cd/E17276_01/html/api_reference/C/envopen.html
-  DATABASE_MODE = 0664
 
   # Lazily loaded database in read/write mode. If this method is called, a
   # database file with be created in the `HOMEBREW_CACHE` with name
   # corresponding to the `@type` instance variable
   #
-  # @return [DBM] db
+  # @return [Hash] db
   def db
-    # DBM::WRCREAT: Creates the database if it does not already exist
     @db ||= begin
-      HOMEBREW_CACHE.mkpath
-      DBM.open(dbm_file_path, DATABASE_MODE, DBM::WRCREAT)
+      JSON.parse(cache_path.read) if created?
+    rescue JSON::ParserError
+      nil
     end
+    @db ||= {}
   end
 
   # Creates a CacheStoreDatabase
@@ -76,26 +96,18 @@ class CacheStoreDatabase
     @type = type
   end
 
-  # `DBM` appends `.db` file extension to the path provided, which is why it's
-  # not included
-  #
-  # @return [String]
-  def dbm_file_path
-    File.join(HOMEBREW_CACHE, @type.to_s)
-  end
-
   # The path where the database resides in the `HOMEBREW_CACHE` for the given
   # `@type`
   #
   # @return [String]
   def cache_path
-    "#{dbm_file_path}.db"
+    HOMEBREW_CACHE/"#{@type}.json"
   end
 end
 
 #
 # `CacheStore` provides methods to mutate and fetch data from a persistent
-# storage mechanism
+# storage mechanism.
 #
 class CacheStore
   # @param  [CacheStoreDatabase] database
@@ -116,14 +128,14 @@ class CacheStore
   # stored
   #
   # @abstract
-  def fetch_type(*)
+  def fetch(*)
     raise NotImplementedError
   end
 
   # Deletes data from the cache based on a condition defined in a concrete class
   #
   # @abstract
-  def flush_cache!
+  def delete!(*)
     raise NotImplementedError
   end
 
@@ -131,21 +143,4 @@ class CacheStore
 
   # @return [CacheStoreDatabase]
   attr_reader :database
-
-  # DBM stores ruby objects as a ruby `String`. Hence, when fetching the data,
-  # to convert the ruby string back into a ruby `Hash`, the string is converted
-  # into a JSON compatible string in `ruby_hash_to_json_string`, where it may
-  # later be parsed by `JSON.parse` in the `json_string_to_ruby_hash` method
-  #
-  # @param  [Hash] ruby `Hash` to be converted to `JSON` string
-  # @return [String]
-  def ruby_hash_to_json_string(hash)
-    hash.to_json
-  end
-
-  # @param  [String] `JSON` string to be converted to ruby `Hash`
-  # @return [Hash]
-  def json_string_to_ruby_hash(string)
-    JSON.parse(string)
-  end
 end

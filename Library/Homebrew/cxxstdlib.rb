@@ -16,6 +16,7 @@ class CxxStdlib
     if type && ![:libstdcxx, :libcxx].include?(type)
       raise ArgumentError, "Invalid C++ stdlib type: #{type}"
     end
+
     klass = (compiler.to_s =~ GNU_GCC_REGEXP) ? GnuStdlib : AppleStdlib
     klass.new(type, compiler)
   end
@@ -39,10 +40,10 @@ class CxxStdlib
     @compiler = compiler.to_sym
   end
 
-  # If either package doesn't use C++, all is well
-  # libstdc++ and libc++ aren't ever intercompatible
+  # If either package doesn't use C++, all is well.
+  # libstdc++ and libc++ aren't ever intercompatible.
   # libstdc++ is compatible across Apple compilers, but
-  # not between Apple and GNU compilers, or between GNU compiler versions
+  # not between Apple and GNU compilers, or between GNU compiler versions.
   def compatible_with?(other)
     return true if type.nil? || other.type.nil?
 

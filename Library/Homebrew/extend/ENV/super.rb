@@ -235,7 +235,7 @@ module Superenv
       Hardware::CPU.optimization_flags.fetch(arch)
     elsif Hardware::CPU.intel? && !Hardware::CPU.sse4?
       Hardware::CPU.optimization_flags.fetch(Hardware.oldest_cpu)
-    elsif compiler == :clang
+    elsif ![:gcc_4_0, :gcc_4_2].include?(compiler)
       "-march=native"
     # This is mutated elsewhere, so return an empty string in this case
     else
@@ -278,6 +278,7 @@ module Superenv
     # GCC doesn't accept "-march" for a 32-bit CPU with "-arch x86_64"
     return if compiler_any_clang?
     return unless Hardware::CPU.is_32_bit?
+
     self["HOMEBREW_OPTFLAGS"] = self["HOMEBREW_OPTFLAGS"].sub(
       /-march=\S*/,
       "-Xarch_#{Hardware::CPU.arch_32_bit} \\0",

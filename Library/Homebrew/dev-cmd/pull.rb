@@ -1,7 +1,6 @@
 #:  * `pull` [`--bottle`] [`--bump`] [`--clean`] [`--ignore-whitespace`] [`--resolve`] [`--branch-okay`] [`--no-pbcopy`] [`--no-publish`] [`--warn-on-publish-failure`] [`--bintray-org=`<bintray-org>] [`--test-bot-user=`<test-bot-user>] <patch-source> [<patch-source>]:
-#:
-#:    Gets a patch from a GitHub commit or pull request and applies it to Homebrew.
-#:    Optionally, installs the formulae changed by the patch.
+#:    Get a patch from a GitHub commit or pull request and apply it to Homebrew.
+#:    Optionally, publish updated bottles for the formulae changed by the patch.
 #:
 #:    Each <patch-source> may be one of:
 #:
@@ -42,11 +41,11 @@
 #:    If `--warn-on-publish-failure` was passed, do not exit if there's a
 #:    failure publishing bottles on Bintray.
 #:
-#:    If `--bintray-org=`<bintray-org> is passed, publish at the given Bintray
+#:    If `--bintray-org=`<bintray-org> is passed, publish at the provided Bintray
 #:    organisation.
 #:
 #:    If `--test-bot-user=`<test-bot-user> is passed, pull the bottle block
-#:    commit from the specified user on GitHub.
+#:    commit from the provided user on GitHub.
 
 require "net/http"
 require "net/https"
@@ -64,6 +63,7 @@ module GitHub
   def test_bot_user(user, test_bot)
     return test_bot if test_bot
     return "BrewTestBot" if user.casecmp("homebrew").zero?
+
     "#{user.capitalize}TestBot"
   end
 end
@@ -71,24 +71,59 @@ end
 module Homebrew
   module_function
 
+  def pull_args
+    Homebrew::CLI::Parser.new do
+      usage_banner <<~EOS
+        `pull` [<options>] <patch sources>
+
+        Get a patch from a GitHub commit or pull request and apply it to Homebrew.
+        Optionally, publish updated bottles for the formulae changed by the patch.
+
+        Each <patch source> may be one of:
+
+          ~ The ID number of a PR (pull request) in the homebrew/core GitHub
+            repository
+
+          ~ The URL of a PR on GitHub, using either the web page or API URL
+            formats. In this form, the PR may be on Homebrew/brew,
+            Homebrew/homebrew-core or any tap.
+
+          ~ The URL of a commit on GitHub
+
+          ~ A "https://jenkins.brew.sh/job/..." string specifying a testing job ID
+      EOS
+      switch "--bottle",
+        description: "Handle bottles, pulling the bottle-update commit and publishing files on Bintray."
+      switch "--bump",
+        description: "For one-formula PRs, automatically reword commit message to our preferred format."
+      switch "--clean",
+        description: "Do not rewrite or otherwise modify the commits found in the pulled PR."
+      switch "--ignore-whitespace",
+        description: "Silently ignore whitespace discrepancies when applying diffs."
+      switch "--resolve",
+        description: "When a patch fails to apply, leave in progress and allow user to resolve, instead "\
+                     "of aborting."
+      switch "--branch-okay",
+        description: "Do not warn if pulling to a branch besides master (useful for testing)."
+      switch "--no-pbcopy",
+        description: "Do not copy anything to the system clipboard."
+      switch "--no-publish",
+        description: "Do not publish bottles to Bintray."
+      switch "--warn-on-publish-failure",
+        description: "Do not exit if there's a failure publishing bottles on Bintray."
+      flag   "--bintray-org=",
+        description: "Publish bottles at the provided Bintray <organisation>."
+      flag   "--test-bot-user=",
+        description: "Pull the bottle block commit from the provided <user> on GitHub."
+      switch :verbose
+      switch :debug
+    end
+  end
+
   def pull
     odie "You meant `git pull --rebase`." if ARGV[0] == "--rebase"
 
-    Homebrew::CLI::Parser.parse do
-      switch "--bottle"
-      switch "--bump"
-      switch "--clean"
-      switch "--ignore-whitespace"
-      switch "--resolve"
-      switch "--branch-okay"
-      switch "--no-pbcopy"
-      switch "--no-publish"
-      switch "--warn-on-publish-failure"
-      switch :verbose
-      switch :debug
-      flag   "--bintray-org="
-      flag   "--test-bot-user="
-    end
+    pull_args.parse
 
     if ARGV.named.empty?
       odie "This command requires at least one argument containing a URL or pull request number"
@@ -127,7 +162,7 @@ module Homebrew
       if (testing_match = arg.match %r{/job/Homebrew.*Testing/(\d+)/})
         tap = ARGV.value("tap")
         tap = if tap&.start_with?("homebrew/")
-          Tap.fetch("homebrew", tap.strip_prefix("homebrew/"))
+          Tap.fetch("homebrew", tap.delete_prefix("homebrew/"))
         elsif tap
           odie "Tap option did not start with \"homebrew/\": #{tap}"
         else
@@ -194,6 +229,7 @@ module Homebrew
           "--diff-filter=AM", orig_revision, "HEAD", "--", tap.formula_dir.to_s
         ).each_line do |line|
           next unless line.end_with? ".rb\n"
+
           name = "#{tap.name}/#{File.basename(line.chomp, ".rb")}"
           changed_formulae_names << name
         end
@@ -227,6 +263,7 @@ module Homebrew
           end
         else
           next unless f.bottle_defined?
+
           opoo "#{f.full_name} has a bottle: do you need to update it with --bottle?"
         end
       end
@@ -320,8 +357,10 @@ module Homebrew
       changed_formulae_names.each do |name|
         f = Formula[name]
         next if f.bottle_unneeded? || f.bottle_disabled?
+
         bintray_org = args.bintray_org || tap.user.downcase
         next unless publish_bottle_file_on_bintray(f, bintray_org, bintray_creds)
+
         published << f.full_name
       end
     else
@@ -414,9 +453,9 @@ module Homebrew
     { files: files, formulae: formulae, others: others }
   end
 
-  # Get current formula versions without loading formula definition in this process
-  # Returns info as a hash (type => version), for pull.rb's internal use
-  # Uses special key :nonexistent => true for nonexistent formulae
+  # Get current formula versions without loading formula definition in this process.
+  # Returns info as a hash (type => version), for pull.rb's internal use.
+  # Uses special key `:nonexistent => true` for nonexistent formulae.
   def current_versions_from_info_external(formula_name)
     info = FormulaInfoFromJson.lookup(formula_name)
     versions = {}
@@ -481,6 +520,7 @@ module Homebrew
     if info.nil?
       raise "Failed publishing bottle: failed reading formula info for #{f.full_name}"
     end
+
     unless info.bottle_info_any
       opoo "No bottle defined in formula #{package}"
       return false
@@ -495,11 +535,12 @@ module Homebrew
     true
   rescue => e
     raise unless @args.warn_on_publish_failure?
+
     onoe e
     false
   end
 
-  # Formula info drawn from an external "brew info --json" call
+  # Formula info drawn from an external `brew info --json` call
   class FormulaInfoFromJson
     # The whole info structure parsed from the JSON
     attr_accessor :info
@@ -508,12 +549,12 @@ module Homebrew
       @info = info
     end
 
-    # Looks up formula on disk and reads its info
-    # Returns nil if formula is absent or if there was an error reading it
+    # Looks up formula on disk and reads its info.
+    # Returns nil if formula is absent or if there was an error reading it.
     def self.lookup(name)
       json = Utils.popen_read(HOMEBREW_BREW_FILE, "info", "--json=v1", name)
 
-      return nil unless $CHILD_STATUS.success?
+      return unless $CHILD_STATUS.success?
 
       Homebrew.force_utf8!(json)
       FormulaInfoFromJson.new(JSON.parse(json)[0])
@@ -521,14 +562,17 @@ module Homebrew
 
     def bottle_tags
       return [] unless info["bottle"]["stable"]
+
       info["bottle"]["stable"]["files"].keys
     end
 
     def bottle_info(my_bottle_tag = Utils::Bottles.tag)
       tag_s = my_bottle_tag.to_s
-      return nil unless info["bottle"]["stable"]
+      return unless info["bottle"]["stable"]
+
       btl_info = info["bottle"]["stable"]["files"][tag_s]
-      return nil unless btl_info
+      return unless btl_info
+
       BottleInfo.new(btl_info["url"], btl_info["sha256"])
     end
 
@@ -537,7 +581,7 @@ module Homebrew
     end
 
     def any_bottle_tag
-      tag = Utils::Bottles.tag
+      tag = Utils::Bottles.tag.to_s
       # Prefer native bottles as a convenience for download caching
       bottle_tags.include?(tag) ? tag : bottle_tags.first
     end
@@ -556,11 +600,11 @@ module Homebrew
     end
   end
 
-  # Bottle info as used internally by pull, with alternate platform support
+  # Bottle info as used internally by pull, with alternate platform support.
   class BottleInfo
     # URL of bottle as string
     attr_accessor :url
-    # Expected SHA256 as string
+    # Expected SHA-256 as string
     attr_accessor :sha256
 
     def initialize(url, sha256)
@@ -596,7 +640,7 @@ module Homebrew
           opoo "Cannot publish bottle: Failed reading info for formula #{f.full_name}"
           next
         end
-        bottle_info = jinfo.bottle_info(jinfo.bottle_tags.first)
+        bottle_info = jinfo.bottle_info_any
         unless bottle_info
           opoo "No bottle defined in formula #{f.full_name}"
           next
@@ -623,6 +667,7 @@ module Homebrew
             if retry_count >= max_retries
               raise "Failed to find published #{f} bottle at #{url}!"
             end
+
             print(wrote_dots ? "." : "Waiting on Bintray.")
             wrote_dots = true
             sleep poll_retry_delay_seconds
@@ -641,12 +686,13 @@ module Homebrew
         # We're in the cache; make sure to force re-download
         loop do
           begin
-            curl_download url, continue_at: 0, to: filename
+            curl_download url, to: filename
             break
           rescue
             if retry_count >= max_curl_retries
               raise "Failed to download #{f} bottle from #{url}!"
             end
+
             puts "curl download failed; retrying in #{curl_retry_delay_seconds} sec"
             sleep curl_retry_delay_seconds
             curl_retry_delay_seconds *= 2
@@ -663,6 +709,7 @@ module Homebrew
     headers, = curl_output("--connect-timeout", "15", "--location", "--head", url)
     status_code = headers.scan(%r{^HTTP\/.* (\d+)}).last.first
     return if status_code.start_with?("2")
+
     opoo "The Bintray mirror #{url} is not reachable (HTTP status code #{status_code})."
     opoo "Do you need to upload it with `brew mirror #{name}`?"
   end

@@ -10,13 +10,6 @@ class X11Requirement < Requirement
 
   env { ENV.x11 }
 
-  def initialize(name = "x11", tags = [])
-    @name = name
-    # no-op on version specified as a tag argument
-    tags.shift if /(\d\.)+\d/ =~ tags.first
-    super(tags)
-  end
-
   def min_version
     "1.12.2"
   end
@@ -40,16 +33,18 @@ class X11Requirement < Requirement
   end
 
   def message
-    "X11 is required to install this formula, either Xorg #{min_version} or xdpyinfo #{min_xdpyinfo_version}, or newer. #{super}"
+    "X11 is required to install this formula, either Xorg #{min_version} or " \
+    "xdpyinfo #{min_xdpyinfo_version}, or newer. #{super}"
   end
 
   def <=>(other)
     return unless other.is_a? X11Requirement
+
     0
   end
 
   def inspect
-    "#<#{self.class.name}: #{name.inspect} #{tags.inspect}>"
+    "#<#{self.class.name}: #{tags.inspect}>"
   end
 end
 

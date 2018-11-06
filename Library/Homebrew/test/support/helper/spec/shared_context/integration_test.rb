@@ -53,8 +53,9 @@ RSpec.shared_context "integration test" do
   def command_id_from_args(args)
     @command_count ||= 0
     pretty_args = args.join(" ").gsub(TEST_TMPDIR, "@TMPDIR@")
-    file_and_line = caller[1].sub(/(.*\d+):.*/, '\1')
-                             .sub("#{HOMEBREW_LIBRARY_PATH}/test/", "")
+    file_and_line = caller.second
+                          .sub(/(.*\d+):.*/, '\1')
+                          .sub("#{HOMEBREW_LIBRARY_PATH}/test/", "")
     "#{file_and_line}:brew #{pretty_args}:#{@command_count += 1}"
   end
 
@@ -71,13 +72,13 @@ RSpec.shared_context "integration test" do
     ].compact.join(File::PATH_SEPARATOR)
 
     env.merge!(
-      "PATH" => path,
-      "HOMEBREW_PATH" => path,
-      "HOMEBREW_BREW_FILE" => HOMEBREW_PREFIX/"bin/brew",
+      "PATH"                      => path,
+      "HOMEBREW_PATH"             => path,
+      "HOMEBREW_BREW_FILE"        => HOMEBREW_PREFIX/"bin/brew",
       "HOMEBREW_INTEGRATION_TEST" => command_id_from_args(args),
-      "HOMEBREW_TEST_TMPDIR" => TEST_TMPDIR,
-      "HOMEBREW_DEVELOPER" => ENV["HOMEBREW_DEVELOPER"],
-      "GEM_HOME" => nil,
+      "HOMEBREW_TEST_TMPDIR"      => TEST_TMPDIR,
+      "HOMEBREW_DEVELOPER"        => ENV["HOMEBREW_DEVELOPER"],
+      "GEM_HOME"                  => nil,
     )
 
     @ruby_args ||= begin
@@ -100,6 +101,7 @@ RSpec.shared_context "integration test" do
           # full_require_paths isn't available in RubyGems < 2.2.
           spec.require_paths.map do |lib|
             next lib if lib.include?(full_gem_path)
+
             "#{full_gem_path}/#{lib}"
           end
         end
@@ -173,7 +175,16 @@ RSpec.shared_context "integration test" do
 
   def setup_remote_tap(name)
     Tap.fetch(name).tap do |tap|
-      tap.install(full_clone: false, quiet: true) unless tap.installed?
+      next if tap.installed?
+      full_name = Tap.fetch(name).full_name
+      # Check to see if the original Homebrew process has taps we can use.
+      system_tap_path = Pathname("#{ENV["HOMEBREW_LIBRARY"]}/Taps/#{full_name}")
+      if system_tap_path.exist?
+        system "git", "clone", "--shared", system_tap_path, tap.path
+        system "git", "-C", tap.path, "checkout", "master"
+      else
+        tap.install(full_clone: false, quiet: true)
+      end
     end
   end
 

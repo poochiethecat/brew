@@ -9,7 +9,7 @@ module UnpackStrategy
         ".tar",
         ".tbz", ".tbz2", ".tar.bz2",
         ".tgz", ".tar.gz",
-        ".tlz", ".tar.lz",
+        ".tlzma", ".tar.lzma",
         ".txz", ".tar.xz"
       ]
     end
@@ -40,7 +40,7 @@ module UnpackStrategy
         end
 
         system_command! "tar",
-                        args: ["xf", tar_path, "-C", unpack_dir],
+                        args:    ["xf", tar_path, "-C", unpack_dir],
                         verbose: verbose
       end
     end

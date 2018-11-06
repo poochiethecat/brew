@@ -10,6 +10,7 @@ module Utils
 
       def built_as?(f)
         return false unless f.installed?
+
         tab = Tab.for_keg(f.installed_prefix)
         tab.built_as_bottle
       end
@@ -33,6 +34,7 @@ module Utils
           line =~ %r{.+/.+/INSTALL_RECEIPT.json}
         end
         raise "This bottle does not contain the file INSTALL_RECEIPT.json: #{bottle_file}" unless path
+
         path
       end
 
@@ -52,7 +54,7 @@ module Utils
       end
 
       def resolve_version(bottle_file)
-        PkgVersion.parse receipt_path(bottle_file).split("/")[1]
+        PkgVersion.parse receipt_path(bottle_file).split("/").second
       end
 
       def formula_contents(bottle_file,
@@ -61,6 +63,7 @@ module Utils
         formula_path = "#{name}/#{bottle_version}/.brew/#{name}.rb"
         contents = Utils.popen_read "tar", "-xOzf", bottle_file, formula_path
         raise BottleFormulaUnavailableError.new(bottle_file, formula_path) unless $CHILD_STATUS.success?
+
         contents
       end
     end

@@ -5,23 +5,33 @@ module Language
     def self.major_minor_version(python)
       version = /\d\.\d/.match `#{python} --version 2>&1`
       return unless version
+
       Version.create(version.to_s)
     end
 
-    def self.homebrew_site_packages(version = "3.7")
-      HOMEBREW_PREFIX/"lib/python#{version}/site-packages"
+    def self.homebrew_site_packages(python = "python3.7")
+      HOMEBREW_PREFIX/site_packages(python)
+    end
+
+    def self.site_packages(python = "python3.7")
+      if python == "pypy"
+        "site-packages"
+      else
+        "lib/python#{major_minor_version python}/site-packages"
+      end
     end
 
     def self.each_python(build, &block)
       original_pythonpath = ENV["PYTHONPATH"]
-      { "python@3" => "python3", "python@2" => "python2.7" }.each do |python_formula, python|
+      { "python@3" => "python3", "python@2" => "python2.7", "pypy" => "pypy" }.each do |python_formula, python|
         python_formula = Formulary.factory(python_formula)
         next if build.without? python_formula.to_s
+
         version = major_minor_version python
         ENV["PYTHONPATH"] = if python_formula.installed?
           nil
         else
-          homebrew_site_packages(version)
+          homebrew_site_packages(python)
         end
         block&.call python, version
       end
@@ -29,10 +39,10 @@ module Language
     end
 
     def self.reads_brewed_pth_files?(python)
-      version = major_minor_version python
-      return unless homebrew_site_packages(version).directory?
-      return unless homebrew_site_packages(version).writable_real?
-      probe_file = homebrew_site_packages(version)/"homebrew-pth-probe.pth"
+      return unless homebrew_site_packages(python).directory?
+      return unless homebrew_site_packages(python).writable_real?
+
+      probe_file = homebrew_site_packages(python)/"homebrew-pth-probe.pth"
       begin
         probe_file.atomic_write("import site; site.homebrew_was_here = True")
         with_homebrew_path { quiet_system python, "-c", "import site; assert(site.homebrew_was_here)" }
@@ -66,6 +76,7 @@ module Language
         --no-user-cfg
         install
         --prefix=#{prefix}
+        --install-scripts=#{prefix}/bin
         --single-version-externally-managed
         --record=installed.txt
       ]
@@ -83,7 +94,7 @@ module Language
       end
 
       # Instantiates, creates, and yields a {Virtualenv} object for use from
-      # Formula#install, which provides helper methods for instantiating and
+      # {Formula#install}, which provides helper methods for instantiating and
       # installing packages into a Python virtualenv.
       # @param venv_root [Pathname, String] the path to the root of the virtualenv
       #   (often `libexec/"venv"`)
@@ -98,15 +109,16 @@ module Language
 
         # Find any Python bindings provided by recursive dependencies
         formula_deps = formula.recursive_dependencies
-        xy = Language::Python.major_minor_version python
         pth_contents = formula_deps.map do |d|
           next if d.build?
-          dep_site_packages = Formula[d.name].opt_lib/"python#{xy}/site-packages"
+
+          dep_site_packages = Formula[d.name].opt_prefix/Language::Python.site_packages(python)
           next unless dep_site_packages.exist?
+
           "import site; site.addsitedir('#{dep_site_packages}')\n"
         end.compact
         unless pth_contents.empty?
-          (venv_root/"lib/python#{xy}/site-packages/homebrew_deps.pth").write pth_contents.join
+          (venv_root/Language::Python.site_packages(python)/"homebrew_deps.pth").write pth_contents.join
         end
 
         venv
@@ -121,21 +133,23 @@ module Language
       # @api private
       def needs_python?(python)
         return true if build.with?(python)
+
         (requirements.to_a | deps).any? { |r| r.name == python && r.required? }
       end
 
       # Helper method for the common case of installing a Python application.
       # Creates a virtualenv in `libexec`, installs all `resource`s defined
       # on the formula, and then installs the formula. An options hash may be
-      # passed (e.g., :using => "python") to override the default, guessed
+      # passed (e.g., `:using => "python"`) to override the default, guessed
       # formula preference for python or python2, or to resolve an ambiguous
       # case where it's not clear whether python or python2 should be the
       # default guess.
       def virtualenv_install_with_resources(options = {})
         python = options[:using]
         if python.nil?
-          wanted = %w[python python@2 python2 python3 python@3].select { |py| needs_python?(py) }
+          wanted = %w[python python@2 python2 python3 python@3 pypy].select { |py| needs_python?(py) }
           raise FormulaAmbiguousPythonError, self if wanted.size > 1
+
           python = wanted.first || "python2.7"
           python = "python3" if python == "python"
         end
@@ -170,9 +184,8 @@ module Language
           @formula.resource("homebrew-virtualenv").stage do |stage|
             old_pythonpath = ENV.delete "PYTHONPATH"
             begin
-              xy = Language::Python.major_minor_version(@python)
               staging = Pathname.new(stage.staging.tmpdir)
-              ENV.prepend_create_path "PYTHONPATH", staging/"target/lib/python#{xy}/site-packages"
+              ENV.prepend_create_path "PYTHONPATH", staging/"target"/Language::Python.site_packages(@python)
               @formula.system @python, *Language::Python.setup_install_args(staging/"target")
               @formula.system @python, "-s", staging/"target/bin/virtualenv", "-p", @python, @venv_root
             ensure
@@ -184,6 +197,7 @@ module Language
           @venv_root.find do |f|
             next unless f.symlink?
             next unless (rp = f.realpath.to_s).start_with? HOMEBREW_CELLAR
+
             python = rp.include?("python@2") ? "python@2" : "python"
             new_target = rp.sub %r{#{HOMEBREW_CELLAR}/#{python}/[^/]+}, Formula[python].opt_prefix
             f.unlink
@@ -212,6 +226,7 @@ module Language
           targets.each do |t|
             if t.respond_to? :stage
               next if t.name == "homebrew-virtualenv"
+
               t.stage { do_install Pathname.pwd }
             else
               t = t.lines.map(&:strip) if t.respond_to?(:lines) && t =~ /\n/

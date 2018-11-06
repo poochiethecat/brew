@@ -16,9 +16,11 @@ class Keg
       link = file.readlink
       # Don't fix relative symlinks
       next unless link.absolute?
+
       link_starts_cellar = link.to_s.start_with?(HOMEBREW_CELLAR.to_s)
       link_starts_prefix = link.to_s.start_with?(HOMEBREW_PREFIX.to_s)
       next if !link_starts_cellar && !link_starts_prefix
+
       new_src = link.relative_path_from(file.parent)
       file.unlink
       FileUtils.ln_s(new_src, file)
@@ -32,11 +34,11 @@ class Keg
 
   def replace_locations_with_placeholders
     relocation = Relocation.new(
-      old_prefix: HOMEBREW_PREFIX.to_s,
-      old_cellar: HOMEBREW_CELLAR.to_s,
+      old_prefix:     HOMEBREW_PREFIX.to_s,
+      old_cellar:     HOMEBREW_CELLAR.to_s,
       old_repository: HOMEBREW_REPOSITORY.to_s,
-      new_prefix: PREFIX_PLACEHOLDER,
-      new_cellar: CELLAR_PLACEHOLDER,
+      new_prefix:     PREFIX_PLACEHOLDER,
+      new_cellar:     CELLAR_PLACEHOLDER,
       new_repository: REPOSITORY_PLACEHOLDER,
     )
     relocate_dynamic_linkage(relocation)
@@ -45,11 +47,11 @@ class Keg
 
   def replace_placeholders_with_locations(files, skip_linkage: false)
     relocation = Relocation.new(
-      old_prefix: PREFIX_PLACEHOLDER,
-      old_cellar: CELLAR_PLACEHOLDER,
+      old_prefix:     PREFIX_PLACEHOLDER,
+      old_cellar:     CELLAR_PLACEHOLDER,
       old_repository: REPOSITORY_PLACEHOLDER,
-      new_prefix: HOMEBREW_PREFIX.to_s,
-      new_cellar: HOMEBREW_CELLAR.to_s,
+      new_prefix:     HOMEBREW_PREFIX.to_s,
+      new_cellar:     HOMEBREW_CELLAR.to_s,
       new_repository: HOMEBREW_REPOSITORY.to_s,
     )
     relocate_dynamic_linkage(relocation) unless skip_linkage
@@ -64,12 +66,13 @@ class Keg
       s = first.open("rb", &:read)
 
       replacements = {
-        relocation.old_prefix => relocation.new_prefix,
-        relocation.old_cellar => relocation.new_cellar,
+        relocation.old_prefix     => relocation.new_prefix,
+        relocation.old_cellar     => relocation.new_cellar,
         relocation.old_repository => relocation.new_repository,
       }
       changed = s.gsub!(Regexp.union(replacements.keys.sort_by(&:length).reverse), replacements)
       next unless changed
+
       changed_files += [first, *rest].map { |file| file.relative_path_from(path) }
 
       begin
@@ -102,6 +105,7 @@ class Keg
       until io.eof?
         file = Pathname.new(io.readline.chomp)
         next if file.symlink?
+
         yield file if hardlinks.add? file.stat.ino
       end
     end
@@ -126,6 +130,7 @@ class Keg
         next false if pn.basename.to_s == "orig-prefix.txt" # for python virtualenvs
         next true if pn == self/".brew/#{name}.rb"
         next true if Metafiles::EXTENSIONS.include?(pn.extname)
+
         if pn.text_executable?
           text_files << pn
           next true
@@ -144,8 +149,10 @@ class Keg
         # will be `nil` for those lines
         next unless info
         next unless info.include?("text")
+
         path = Pathname.new(path)
         next unless files.include?(path)
+
         text_files << path
       end
     end
@@ -158,6 +165,7 @@ class Keg
 
     path.find do |pn|
       next if pn.symlink? || pn.directory? || ![".la", ".lai"].include?(pn.extname)
+
       libtool_files << pn
     end
     libtool_files
@@ -178,6 +186,10 @@ class Keg
 
   def self.relocation_formulae
     []
+  end
+
+  def self.bottle_dependencies
+    relocation_formulae
   end
 end
 

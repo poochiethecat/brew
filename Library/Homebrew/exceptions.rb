@@ -105,7 +105,7 @@ module FormulaClassUnavailableErrorModule
   end
 
   def format_list(class_list)
-    class_list.map { |klass| klass.name.split("::")[-1] }.join(", ")
+    class_list.map { |klass| klass.name.split("::").last }.join(", ")
   end
 end
 
@@ -352,14 +352,16 @@ class FormulaAmbiguousPythonError < RuntimeError
 end
 
 class BuildError < RuntimeError
-  attr_reader :formula, :env
-  attr_accessor :options
+  attr_reader :cmd, :args, :env
+  attr_accessor :formula, :options
 
   def initialize(formula, cmd, args, env)
     @formula = formula
+    @cmd = cmd
+    @args = args
     @env = env
-    args = args.map { |arg| arg.to_s.gsub " ", "\\ " }.join(" ")
-    super "Failed executing: #{cmd} #{args}"
+    pretty_args = args.map { |arg| arg.to_s.gsub " ", "\\ " }.join(" ")
+    super "Failed executing: #{cmd} #{pretty_args}"
   end
 
   def issues
@@ -427,37 +429,30 @@ class BuildError < RuntimeError
     checks.build_error_checks.each do |check|
       out = checks.send(check)
       next if out.nil?
+
       puts
       ofail out
     end
   end
 end
 
-# raised by FormulaInstaller.check_dependencies_bottled and
-# FormulaInstaller.install if the formula or its dependencies are not bottled
-# and are being installed on a system without necessary build tools
+# Raised by {FormulaInstaller#check_dependencies_bottled} and
+# {FormulaInstaller#install} if the formula or its dependencies are not bottled
+# and are being installed on a system without necessary build tools.
 class BuildToolsError < RuntimeError
   def initialize(formulae)
-    if formulae.length > 1
-      formula_text = "formulae"
-      package_text = "binary packages"
-    else
-      formula_text = "formula"
-      package_text = "a binary package"
-    end
-
     super <<~EOS
-      The following #{formula_text}:
-        #{formulae.join(", ")}
-      cannot be installed as #{package_text} and must be built from source.
+      The following #{"formula".pluralize(formulae.count)}
+        #{formulae.to_sentence}
+      cannot be installed as #{"binary package".pluralize(formulae.count)} and must be built from source.
       #{DevelopmentTools.installation_instructions}
     EOS
   end
 end
 
-# raised by Homebrew.install, Homebrew.reinstall, and Homebrew.upgrade
+# Raised by Homebrew.install, Homebrew.reinstall, and Homebrew.upgrade
 # if the user passes any flags/environment that would case a bottle-only
-# installation on a system without build tools to fail
+# installation on a system without build tools to fail.
 class BuildFlagsError < RuntimeError
   def initialize(flags, bottled: true)
     if flags.length > 1
@@ -483,8 +478,8 @@ class BuildFlagsError < RuntimeError
   end
 end
 
-# raised by CompilerSelector if the formula fails with all of
-# the compilers available on the user's system
+# Raised by {CompilerSelector} if the formula fails with all of
+# the compilers available on the user's system.
 class CompilerSelectionError < RuntimeError
   def initialize(formula)
     super <<~EOS
@@ -494,7 +489,7 @@ class CompilerSelectionError < RuntimeError
   end
 end
 
-# Raised in Resource.fetch
+# Raised in {Resource#fetch}.
 class DownloadError < RuntimeError
   def initialize(resource, cause)
     super <<~EOS
@@ -505,7 +500,7 @@ class DownloadError < RuntimeError
   end
 end
 
-# raised in CurlDownloadStrategy.fetch
+# Raised in {CurlDownloadStrategy#fetch}.
 class CurlDownloadStrategyError < RuntimeError
   def initialize(url)
     case url
@@ -517,21 +512,31 @@ class CurlDownloadStrategyError < RuntimeError
   end
 end
 
-# raised in ScpDownloadStrategy.fetch
+# Raised in {ScpDownloadStrategy#fetch}.
 class ScpDownloadStrategyError < RuntimeError
   def initialize(cause)
     super "Download failed: #{cause}"
   end
 end
 
-# raised by safe_system in utils.rb
+# Raised by {#safe_system} in `utils.rb`.
 class ErrorDuringExecution < RuntimeError
+  attr_reader :cmd
   attr_reader :status
+  attr_reader :output
 
   def initialize(cmd, status:, output: nil)
+    @cmd = cmd
     @status = status
+    @output = output
 
-    s = "Failure while executing; `#{cmd.shelljoin.gsub(/\\=/, "=")}` exited with #{status.exitstatus}."
+    exitstatus = if status.respond_to?(:exitstatus)
+      status.exitstatus
+    else
+      status
+    end
+
+    s = "Failure while executing; `#{cmd.shelljoin.gsub(/\\=/, "=")}` exited with #{exitstatus}."
 
     unless [*output].empty?
       format_output_line = lambda do |type, line|
@@ -551,10 +556,10 @@ class ErrorDuringExecution < RuntimeError
   end
 end
 
-# raised by Pathname#verify_checksum when "expected" is nil or empty
+# Raised by {Pathname#verify_checksum} when "expected" is nil or empty.
 class ChecksumMissingError < ArgumentError; end
 
-# raised by Pathname#verify_checksum when verification fails
+# Raised by {Pathname#verify_checksum} when verification fails.
 class ChecksumMismatchError < RuntimeError
   attr_reader :expected, :hash_type
 
@@ -584,7 +589,7 @@ class DuplicateResourceError < ArgumentError
   end
 end
 
-# raised when a single patch file is not found and apply hasn't been specified
+# Raised when a single patch file is not found and apply hasn't been specified.
 class MissingApplyError < RuntimeError; end
 
 class BottleFormulaUnavailableError < RuntimeError
@@ -594,5 +599,24 @@ class BottleFormulaUnavailableError < RuntimeError
         #{bottle_path}
         #{formula_path}
     EOS
+  end
+end
+
+# Raised when a child process sends us an exception over its error pipe.
+class ChildProcessError < RuntimeError
+  attr_reader :inner
+  attr_reader :inner_class
+
+  def initialize(inner)
+    @inner = inner
+    @inner_class = Object.const_get inner["json_class"]
+
+    super <<~EOS
+      An exception occurred within a child process:
+        #{inner_class}: #{inner["m"]}
+    EOS
+
+    # Clobber our real (but irrelevant) backtrace with that of the inner exception.
+    set_backtrace inner["b"]
   end
 end

@@ -6,7 +6,7 @@
 #:
 #:    With <URL> unspecified, taps a formula repository from GitHub using HTTPS.
 #:    Since so many taps are hosted on GitHub, this command is a shortcut for
-#:    `tap <user>/<repo> https://github.com/<user>/homebrew-<repo>`.
+#:    `brew tap` <user>`/`<repo> `https://github.com/`<user>`/homebrew-`<repo>.
 #:
 #:    With <URL> specified, taps a formula repository from anywhere, using
 #:    any transport protocol that `git` handles. The one-argument form of `tap`
@@ -38,19 +38,17 @@ module Homebrew
   def tap
     if ARGV.include? "--repair"
       Tap.each(&:link_completions_and_manpages)
-    elsif ARGV.include? "--list-official"
-      odisabled("brew tap --list-official")
     elsif ARGV.include? "--list-pinned"
       puts Tap.select(&:pinned?).map(&:name)
     elsif ARGV.named.empty?
       puts Tap.names
     else
-      tap = Tap.fetch(ARGV.named[0])
+      tap = Tap.fetch(ARGV.named.first)
       begin
-        tap.install clone_target: ARGV.named[1],
+        tap.install clone_target:      ARGV.named.second,
                     force_auto_update: force_auto_update?,
-                    full_clone: full_clone?,
-                    quiet: ARGV.quieter?
+                    full_clone:        full_clone?,
+                    quiet:             ARGV.quieter?
       rescue TapRemoteMismatchError => e
         odie e
       rescue TapAlreadyTappedError, TapAlreadyUnshallowError # rubocop:disable Lint/HandleExceptions

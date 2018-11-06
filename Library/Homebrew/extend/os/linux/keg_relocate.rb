@@ -1,5 +1,8 @@
 class Keg
   def relocate_dynamic_linkage(relocation)
+    # Patching the dynamic linker of glibc breaks it.
+    return if name == "glibc"
+
     # Patching patchelf using itself fails with "Text file busy" or SIGBUS.
     return if name == "patchelf"
 
@@ -21,7 +24,7 @@ class Keg
     # Skip ELF files that do not have a .dynstr section.
     return if ["cannot find section .dynstr", "strange: no string table"].include?(old_rpath)
     unless $CHILD_STATUS.success?
-      raise ErrorDuringExecution.new(cmd_rpath, status: $CHILD_STATUS, output: [:stdout, old_rpath])
+      raise ErrorDuringExecution.new(cmd_rpath, status: $CHILD_STATUS, output: [[:stderr, old_rpath]])
     end
 
     rpath = old_rpath
@@ -45,6 +48,7 @@ class Keg
     end
 
     return if old_rpath == new_rpath && old_interpreter == new_interpreter
+
     safe_system(*cmd, file)
   end
 
@@ -54,6 +58,7 @@ class Keg
     elf_files.each do |file|
       next unless file.dynamic_elf?
       next if file.binary_executable? && skip_executables
+
       dylibs = file.dynamically_linked_libraries
       results << :libcxx if dylibs.any? { |s| s.include? "libc++.so" }
       results << :libstdcxx if dylibs.any? { |s| s.include? "libstdc++.so" }
@@ -72,6 +77,7 @@ class Keg
       # same dev ID and inode). This prevents relocations from being performed
       # on a binary more than once.
       next unless hardlinks.add? [pn.stat.dev, pn.stat.ino]
+
       elf_files << pn
     end
     elf_files
@@ -79,5 +85,18 @@ class Keg
 
   def self.relocation_formulae
     ["patchelf"]
+  end
+
+  def self.bottle_dependencies
+    @bottle_dependencies ||= begin
+      formulae = relocation_formulae
+      gcc = Formula["gcc"]
+      if !ENV["HOMEBREW_FORCE_HOMEBREW_ON_LINUX"] &&
+         DevelopmentTools.non_apple_gcc_version("gcc") < gcc.version.to_i
+        formulae += gcc.recursive_dependencies.map(&:name)
+        formulae << gcc.name
+      end
+      formulae
+    end
   end
 end
