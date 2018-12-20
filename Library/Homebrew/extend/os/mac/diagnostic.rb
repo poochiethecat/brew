@@ -61,7 +61,7 @@ module Homebrew
           You are using macOS #{MacOS.version}.
           #{who} do not provide support for this #{what}.
           You will encounter build failures and other breakages.
-          Please create pull-requests instead of asking for help on Homebrew's
+          Please create pull requests instead of asking for help on Homebrew's
           GitHub, Discourse, Twitter or IRC. As you are running this #{what},
           you are responsible for resolving any issues you experience.
         EOS
@@ -111,9 +111,11 @@ module Homebrew
 
       def check_xcode_minimum_version
         return unless MacOS::Xcode.below_minimum_version?
+        xcode = MacOS::Xcode.version.to_s
+        xcode += " => #{MacOS::Xcode.prefix}" unless MacOS::Xcode.default_prefix?
 
         <<~EOS
-          Your Xcode (#{MacOS::Xcode.version}) is too outdated.
+          Your Xcode (#{xcode}) is too outdated.
           Please update to Xcode #{MacOS::Xcode.latest_version} (or delete it).
           #{MacOS::Xcode.update_instructions}
         EOS

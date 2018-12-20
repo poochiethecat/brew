@@ -15,7 +15,8 @@ didn't include with macOS.
 
 For the full command list, see the [COMMANDS](#commands) section.
 
-With `--verbose` or `-v`, many commands print extra debugging information. Note that these flags should only appear after a command.
+With `--verbose` or `-v`, many commands print extra debugging information. Note that
+these flags should only appear after a command.
 
   * `install` *`formula`*:
     Install *`formula`*.
@@ -30,9 +31,9 @@ With `--verbose` or `-v`, many commands print extra debugging information. Note 
     List all installed formulae.
 
   * `search` (*`text`*|`/`*`text`*`/`):
-    Perform a substring search of formula names for *`text`*. If *`text`* is
-    surrounded with slashes, then it is interpreted as a regular expression.
-    The search for *`text`* is extended online to some popular taps.
+    Perform a substring search of cask tokens and formula names for *`text`*. If *`text`*
+    is surrounded with slashes, then it is interpreted as a regular expression.
+    The search for *`text`* is extended online to `homebrew/core` and `homebrew/cask`.
     If no search term is given, all locally available formulae are listed.
 
 ## COMMANDS
@@ -311,6 +312,9 @@ With `--verbose` or `-v`, many commands print extra debugging information. Note 
     If `--git` (or `-g`) is passed, Homebrew will create a Git repository, useful for
     creating patches to the software.
 
+    If `HOMEBREW_INSTALL_CLEANUP` is set then remove previously installed versions
+    of upgraded *`formulae`* as well as the HOMEBREW_CACHE for that formula.
+
   * `leaves`:
     Show installed formulae that are not dependencies of another installed formula.
 
@@ -428,6 +432,9 @@ With `--verbose` or `-v`, many commands print extra debugging information. Note 
     If `--display-times` is passed, install times for each formula are printed
     at the end of the run.
 
+    If `HOMEBREW_INSTALL_CLEANUP` is set then remove previously installed versions
+    of upgraded *`formulae`* as well as the HOMEBREW_CACHE for that formula.
+
   * `search`, `-S`:
     Display all locally available formulae (including tapped ones).
     No online search is performed.
@@ -439,7 +446,7 @@ With `--verbose` or `-v`, many commands print extra debugging information. Note 
   * `search` [`--desc`] (*`text`*|`/`*`text`*`/`):
     Perform a substring search of cask tokens and formula names for *`text`*. If *`text`*
     is surrounded with slashes, then it is interpreted as a regular expression.
-    The search for *`text`* is extended online to official taps.
+    The search for *`text`* is extended online to `homebrew/core` and `homebrew/cask`.
 
     If `--desc` is passed, search formulae with a description matching *`text`* and
     casks with a name matching *`text`*.
@@ -601,7 +608,7 @@ With `--verbose` or `-v`, many commands print extra debugging information. Note 
 
     Options for the `install` command are also valid here.
 
-    If `--cleanup` is specified or `HOMEBREW_UPGRADE_CLEANUP` is set then remove
+    If `--cleanup` is specified or `HOMEBREW_INSTALL_CLEANUP` is set then remove
     previously installed version(s) of upgraded *`formulae`*.
 
     If `--fetch-HEAD` is passed, fetch the upstream repository to detect if
@@ -1094,20 +1101,23 @@ can take several different forms:
     You can still access these formulae by using a special syntax, e.g.
     `homebrew/dupes/vim` or `homebrew/versions/node4`.
 
-  * An arbitrary URL:
+  * An arbitrary file or URL:
     Homebrew can install formulae via URL, e.g.
-    `https://raw.github.com/Homebrew/homebrew-core/master/Formula/git.rb`.
-    The formula file will be cached for later use.
+    `https://raw.githubusercontent.com/Homebrew/homebrew-core/master/Formula/git.rb`,
+    or from a local path. It could point to either a formula file or a bottle.
+    In the case of a URL, the downloaded file will be cached for later use.
 
 ## ENVIRONMENT
 
-Note that environment variables must have a value set to be detected. For example, `export HOMEBREW_NO_INSECURE_REDIRECT=1` rather than just `export HOMEBREW_NO_INSECURE_REDIRECT`.
+Note that environment variables must have a value set to be detected. For example,
+`export HOMEBREW_NO_INSECURE_REDIRECT=1` rather than just
+`export HOMEBREW_NO_INSECURE_REDIRECT`.
 
   * `HOMEBREW_ARTIFACT_DOMAIN`:
-    If set, instructs Homebrew to prefix all download URLs, including those
-    for bottles, with this variable. For example, a formula with a URL of
-    `https://example.com/foo.tar.gz` but `HOMEBREW_ARTIFACT_DOMAIN=http://localhost:8080`
-    would instead download from `http://localhost:8080/example.com/foo.tar.gz`.
+    If set, instructs Homebrew to prefix all download URLs, including those for bottles,
+    with this variable. For example, `HOMEBREW_ARTIFACT_DOMAIN=http://localhost:8080`
+    will cause a formula with the URL `https://example.com/foo.tar.gz` to instead
+    download from `http://localhost:8080/example.com/foo.tar.gz`.
 
   * `HOMEBREW_AUTO_UPDATE_SECS`:
     If set, Homebrew will only check for autoupdates once per this seconds interval.
@@ -1119,18 +1129,17 @@ Note that environment variables must have a value set to be detected. For exampl
     these variables for access credentials (see
     <https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-getting-started.html#cli-environment>
     to retrieve these access credentials from AWS). If they are not set,
-    the `S3` download strategy will download with a public
-    (unsigned) URL.
+    the `S3` download strategy will download with a public (unsigned) URL.
 
   * `HOMEBREW_BOTTLE_DOMAIN`:
     By default, Homebrew uses `https://homebrew.bintray.com/` as its download
-    mirror for bottles. If set, instructs Homebrew to instead use the given
+    mirror for bottles. If set, instructs Homebrew to instead use the specified
     URL. For example, `HOMEBREW_BOTTLE_DOMAIN=http://localhost:8080` will
     cause all bottles to download from the prefix `http://localhost:8080/`.
 
   * `HOMEBREW_BROWSER`:
-    If set, uses this setting as the browser when opening project homepages,
-    instead of the OS default browser.
+    If set, Homebrew uses this setting as the browser when opening project
+    homepages, instead of the OS default browser.
 
   * `HOMEBREW_BUILD_FROM_SOURCE`:
     If set, instructs Homebrew to compile from source even when a formula
@@ -1139,7 +1148,7 @@ Note that environment variables must have a value set to be detected. For exampl
     using this environment variable.
 
   * `HOMEBREW_CACHE`:
-    If set, instructs Homebrew to use the given directory as the download cache.
+    If set, instructs Homebrew to use the specified directory as the download cache.
 
     *Default:* `~/Library/Caches/Homebrew`.
 
@@ -1153,19 +1162,9 @@ Note that environment variables must have a value set to be detected. For exampl
   * `HOMEBREW_DEBUG`:
     If set, any commands that can emit debugging information will do so.
 
-  * `HOMEBREW_DEBUG_INSTALL`:
-    When `brew install -d` or `brew install -i` drops into a shell,
-    `HOMEBREW_DEBUG_INSTALL` will be set to the name of the formula being
-    brewed.
-
-  * `HOMEBREW_DEBUG_PREFIX`:
-    When `brew install -d` or `brew install -i` drops into a shell,
-    `HOMEBREW_DEBUG_PREFIX` will be set to the target prefix in the Cellar
-    of the formula being brewed.
-
   * `HOMEBREW_DEVELOPER`:
     If set, Homebrew will tweak behaviour to be more relevant for Homebrew
-    developers (active or budding) e.g. turning warnings into errors.
+    developers (active or budding), e.g. turning warnings into errors.
 
   * `HOMEBREW_EDITOR`:
     If set, Homebrew will use this editor when editing a single formula, or
@@ -1188,20 +1187,20 @@ Note that environment variables must have a value set to be detected. For exampl
     system version. Automatically set if the system version of `git` is too old.
 
   * `HOMEBREW_GITHUB_API_TOKEN`:
-    A personal access token for the GitHub API, which you can create at
-    <https://github.com/settings/tokens>. If set, GitHub will allow you a
-    greater number of API requests. See
-    <https://developer.github.com/v3/#rate-limiting> for more information.
-    Homebrew uses the GitHub API for features such as `brew search`.
+    A personal access token for the GitHub API, used by Homebrew for features
+    such as `brew search`. You can create one at <https://github.com/settings/tokens>.
+    If set, GitHub will allow you a greater number of API requests. For more
+    information, see: <https://developer.github.com/v3/#rate-limiting>
 
     *Note:* Homebrew doesn't require permissions for any of the scopes.
 
   * `HOMEBREW_INSTALL_BADGE`:
     Text printed before the installation summary of each successful build.
-    Defaults to the beer emoji.
+
+    *Default:* the beer emoji.
 
   * `HOMEBREW_LOGS`:
-    If set, Homebrew will use the given directory to store log files.
+    If set, Homebrew will use the specified directory to store log files.
 
   * `HOMEBREW_MAKE_JOBS`:
     If set, instructs Homebrew to use the value of `HOMEBREW_MAKE_JOBS` as
@@ -1223,7 +1222,7 @@ Note that environment variables must have a value set to be detected. For exampl
     If set, Homebrew will not print the `HOMEBREW_INSTALL_BADGE` on a
     successful build.
 
-    *Note:* Homebrew will only try to print emoji on Lion or newer.
+    *Note:* Homebrew will only try to print emoji on OS X Lion or newer.
 
   * `HOMEBREW_NO_INSECURE_REDIRECT`:
     If set, Homebrew will not permit redirects from secure HTTPS
@@ -1234,11 +1233,11 @@ Note that environment variables must have a value set to be detected. For exampl
     formulae to fail to download.
 
   * `HOMEBREW_NO_GITHUB_API`:
-    If set, Homebrew will not use the GitHub API for e.g searches or
+    If set, Homebrew will not use the GitHub API, e.g. for searches or
     fetching relevant issues on a failed install.
 
   * `HOMEBREW_PRY`:
-    If set, Homebrew will use `pry` for the `brew irb` command.
+    If set, Homebrew will use Pry for the `brew irb` command.
 
   * `HOMEBREW_SVN`:
     When exporting from Subversion, Homebrew will use `HOMEBREW_SVN` if set,
@@ -1249,11 +1248,14 @@ Note that environment variables must have a value set to be detected. For exampl
   * `HOMEBREW_TEMP`:
     If set, instructs Homebrew to use `HOMEBREW_TEMP` as the temporary directory
     for building packages. This may be needed if your system temp directory and
-    Homebrew Prefix are on different volumes, as macOS has trouble moving
+    Homebrew prefix are on different volumes, as macOS has trouble moving
     symlinks across volumes when the target does not yet exist.
 
-    This issue typically occurs when using FileVault or custom SSD
-    configurations.
+    This issue typically occurs when using FileVault or custom SSD configurations.
+
+  * `HOMEBREW_UPDATE_TO_TAG`:
+    If set, instructs Homebrew to always use the latest stable tag (even if
+    developer commands have been run).
 
   * `HOMEBREW_UPGRADE_CLEANUP`:
     If set, `brew upgrade` always assumes `--cleanup` has been passed.
@@ -1278,13 +1280,15 @@ Note that environment variables must have a value set to be detected. For exampl
     through Homebrew.
 
   * `no_proxy`:
-    Sets the comma-separated list of hostnames and domain names that should be excluded from proxying
-    by `curl`, `git` and `svn` when downloading through Homebrew.
+    Sets the comma-separated list of hostnames and domain names that should be excluded
+    from proxying by `curl`, `git` and `svn` when downloading through Homebrew.
 
 ## USING HOMEBREW BEHIND A PROXY
-Use the `http_proxy`, `https_proxy`, `all_proxy`, `no_proxy` and/or `ftp_proxy` documented above.
 
-For example, for an unauthenticated HTTP or SOCKS5 proxy:
+Set the `http_proxy`, `https_proxy`, `all_proxy`, `ftp_proxy` and/or `no_proxy`
+environment variables documented above.
+
+For example, to use an unauthenticated HTTP or SOCKS5 proxy:
 
     export http_proxy=http://$HOST:$PORT
 
@@ -1304,15 +1308,15 @@ Homebrew Documentation: <https://docs.brew.sh>
 
 Homebrew's lead maintainer is Mike McQuaid.
 
-Homebrew's project leadership committee is Mike McQuaid, JCount, Misty De Meo and Markus Reiter.
+Homebrew's project leadership committee is Mike McQuaid, Misty De Meo and Markus Reiter.
 
-Homebrew/brew's other current maintainers are Claudia, Michka Popoff, Shaun Jackman, Chongyu Zhu, Vitor Galvao, JCount, Misty De Meo, Gautham Goli, Markus Reiter, Steven Peters, Jonathan Chang and William Woodruff.
+Homebrew/brew's other current maintainers are Claudia, Michka Popoff, Shaun Jackman, Chongyu Zhu, Vitor Galvao, Misty De Meo, Gautham Goli, Markus Reiter, Steven Peters, Jonathan Chang and William Woodruff.
 
 Homebrew/brew's Linux support (and Linuxbrew) maintainers are Michka Popoff and Shaun Jackman.
 
-Homebrew/homebrew-core's other current maintainers are Claudia, Michka Popoff, Shaun Jackman, Chongyu Zhu, Izaak Beekman, Sean Molenaar, Jan Viljanen, Jason Tedor, Viktor Szakats, FX Coudert, Thierry Moisan, Steven Peters, JCount, Misty De Meo and Tom Schoonjans.
+Homebrew/homebrew-core's other current maintainers are Claudia, Michka Popoff, Shaun Jackman, Chongyu Zhu, Izaak Beekman, Sean Molenaar, Jan Viljanen, Jason Tedor, Viktor Szakats, FX Coudert, Thierry Moisan, Steven Peters, Misty De Meo and Tom Schoonjans.
 
-Former maintainers with significant contributions include commitay, Dominyk Tiller, Tim Smith, Baptiste Fontaine, Xu Cheng, Martin Afanasjew, Brett Koonce, Charlie Sharpsteen, Jack Nagel, Adam Vandenberg, Andrew Janke, Alex Dunn, neutric, Tomasz Pajor, Uladzislau Shablinski, Alyssa Ross, ilovezfs and Homebrew's creator: Max Howell.
+Former maintainers with significant contributions include JCount, commitay, Dominyk Tiller, Tim Smith, Baptiste Fontaine, Xu Cheng, Martin Afanasjew, Brett Koonce, Charlie Sharpsteen, Jack Nagel, Adam Vandenberg, Andrew Janke, Alex Dunn, neutric, Tomasz Pajor, Uladzislau Shablinski, Alyssa Ross, ilovezfs and Homebrew's creator: Max Howell.
 
 ## BUGS
 

@@ -1,6 +1,8 @@
 require "language/java"
 
 class JavaRequirement < Requirement
+  attr_reader :java_home
+
   fatal true
   download "https://www.oracle.com/technetwork/java/javase/downloads/index.html"
 
@@ -26,7 +28,7 @@ class JavaRequirement < Requirement
   end
 
   def initialize(tags = [])
-    @version = tags.shift if /(\d+\.)+\d/ =~ tags.first
+    @version = tags.shift if /^\d/ =~ tags.first
     super(tags)
   end
 
@@ -86,7 +88,7 @@ class JavaRequirement < Requirement
     javas = []
     javas << Pathname.new(ENV["JAVA_HOME"])/"bin/java" if ENV["JAVA_HOME"]
     jdk = begin
-      Formula["jdk"]
+      Formula["openjdk"]
     rescue FormulaUnavailableError
       nil
     end
@@ -127,7 +129,7 @@ class JavaRequirement < Requirement
   end
 
   def satisfies_version(java)
-    java_version_s = system_command(java, args: ["-version"], print_stderr: false).stderr[/\d+.\d/]
+    java_version_s = system_command(java, args: ["-version"], print_stderr: false).stderr[/\d+\.\d/]
     return false unless java_version_s
 
     java_version = Version.create(java_version_s)

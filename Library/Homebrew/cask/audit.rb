@@ -1,6 +1,7 @@
 require "cask/checkable"
 require "cask/download"
 require "digest"
+require "utils/curl"
 require "utils/git"
 
 module Cask
@@ -23,13 +24,13 @@ module Cask
 
     def run!
       check_required_stanzas
-      check_version_and_checksum
       check_version
       check_sha256
       check_url
       check_generic_artifacts
       check_token_conflicts
       check_download
+      check_https_availability
       check_single_pre_postflight
       check_single_uninstall_zap
       check_untrusted_pkg
@@ -132,31 +133,6 @@ module Cask
       # TODO: specific DSL knowledge should not be spread around in various files like this
       installable_artifacts = cask.artifacts.reject { |k| [:uninstall, :zap].include?(k) }
       add_error "at least one activatable artifact stanza is required" if installable_artifacts.empty?
-    end
-
-    def check_version_and_checksum
-      return if cask.sha256 == :no_check
-
-      return if @cask.sourcefile_path.nil?
-
-      tap = @cask.tap
-      return if tap.nil?
-
-      return if commit_range.nil?
-
-      previous_cask_contents = Git.last_revision_of_file(tap.path, @cask.sourcefile_path, before_commit: commit_range)
-      return if previous_cask_contents.empty?
-
-      begin
-        previous_cask = CaskLoader.load(previous_cask_contents)
-
-        return unless previous_cask.version == cask.version
-        return if previous_cask.sha256 == cask.sha256
-
-        add_error "only sha256 changed (see: https://github.com/Homebrew/homebrew-cask/blob/master/doc/cask_language_reference/stanzas/sha256.md)"
-      rescue CaskError => e
-        add_warning "Skipped version and checksum comparison. Reading previous version failed: #{e}"
-      end
     end
 
     def check_version
@@ -316,6 +292,20 @@ module Cask
       Verify.all(cask, downloaded_path)
     rescue => e
       add_error "download not possible: #{e.message}"
+    end
+
+    def check_https_availability
+      return unless download
+      if !cask.url.blank? && !cask.url.using
+        check_url_for_https_availability(cask.url, user_agents: [cask.url.user_agent])
+      end
+      check_url_for_https_availability(cask.appcast) unless cask.appcast.blank?
+      check_url_for_https_availability(cask.homepage, user_agents: [:browser]) unless cask.homepage.blank?
+    end
+
+    def check_url_for_https_availability(url_to_check, user_agents: [:default])
+      problem = curl_check_http_content(url_to_check.to_s, user_agents: user_agents)
+      add_error problem if problem
     end
   end
 end

@@ -310,7 +310,7 @@ module Homebrew
 
       problem "File should end with a newline" unless text.trailing_newline?
 
-      if @versioned_formula
+      if formula.core_formula? && @versioned_formula
         unversioned_formula = begin
           # build this ourselves as we want e.g. homebrew/core to be present
           full_name = if formula.tap
@@ -527,11 +527,34 @@ module Homebrew
       problem "keg_only reason should not end with a period."
     end
 
+    def audit_postgresql
+      return unless formula.name == "postgresql"
+      major_version = formula.version
+                             .to_s
+                             .split(".")
+                             .first
+                             .to_i
+      previous_major_version = major_version - 1
+      previous_formula_name = "postgresql@#{previous_major_version}"
+      begin
+        Formula[previous_formula_name]
+      rescue FormulaUnavailableError
+        problem "Versioned #{previous_formula_name} must be created for " \
+                "`brew-postgresql-upgrade-database` and `pg_upgrade` to work."
+      end
+    end
+
     def audit_versioned_keg_only
       return unless @versioned_formula
       return unless @core_tap
 
-      return if formula.keg_only? && formula.keg_only_reason.reason == :versioned_formula
+      if formula.keg_only?
+        return if formula.keg_only_reason.reason == :versioned_formula
+        if formula.name.start_with?("openssl", "libressl") &&
+           formula.keg_only_reason.reason == :provided_by_macos
+          return
+        end
+      end
 
       keg_only_whitelist = %w[
         autoconf@2.13

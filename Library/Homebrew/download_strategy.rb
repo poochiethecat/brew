@@ -329,12 +329,14 @@ class CurlDownloadStrategy < AbstractFileDownloadStrategy
   private
 
   def resolved_url_and_basename
-    return @resolved_url_and_basename if defined?(@resolved_url_and_basename)
     resolved_url, basename, = resolve_url_basename_time(url)
-    @resolved_url_and_basename = [resolved_url, basename]
+    [resolved_url, basename]
   end
 
   def resolve_url_basename_time(url)
+    @resolved_info_cache ||= {}
+    return @resolved_info_cache[url] if @resolved_info_cache.include?(url)
+
     if ENV["HOMEBREW_ARTIFACT_DOMAIN"]
       url = url.sub(%r{^((ht|f)tps?://)?}, ENV["HOMEBREW_ARTIFACT_DOMAIN"].chomp("/") + "/")
     end
@@ -353,6 +355,9 @@ class CurlDownloadStrategy < AbstractFileDownloadStrategy
       elsif location.start_with?("/")
         uri = URI(current_url)
         "#{uri.scheme}://#{uri.host}#{location}"
+      elsif location.start_with?("./")
+        uri = URI(current_url)
+        "#{uri.scheme}://#{uri.host}#{Pathname(uri.path).dirname/location}"
       else
         location
       end
@@ -370,7 +375,7 @@ class CurlDownloadStrategy < AbstractFileDownloadStrategy
 
     basename = filenames.last || parse_basename(redirect_url)
 
-    [redirect_url, basename, time]
+    @resolved_info_cache[url] = [redirect_url, basename, time]
   end
 
   def _fetch(url:, resolved_url:)
@@ -679,6 +684,9 @@ class GitDownloadStrategy < VCSDownloadStrategy
                     chdir: cached_location
     system_command! "git",
                     args:  ["config", "remote.origin.fetch", refspec],
+                    chdir: cached_location
+    system_command! "git",
+                    args:  ["config", "remote.origin.tagOpt", "--no-tags"],
                     chdir: cached_location
   end
 
